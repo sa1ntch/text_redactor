@@ -59,6 +59,7 @@ class _EditorScreenState extends State<EditorScreen> {
     _deepgramApiKeyController.addListener(_handleDeepgramApiKeyChanged);
     _textController.addListener(_handleTextChanged);
     _loadMaterial();
+    _restoreDraft();
   }
 
   void _handleDeepgramApiKeyChanged() {
@@ -66,9 +67,10 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _handleTextChanged() {
-    setState(() {});
-    _scheduleSpellingCheck();
-  }
+  setState(() {});
+  _scheduleSpellingCheck();
+  _autoSaveDraft();
+}
 
   void _scheduleSpellingCheck() {
     _spellingDebounce?.cancel();
@@ -212,6 +214,33 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
+  Future<void> _autoSaveDraft() async {
+  await widget.storageService.saveDraft(
+    title: _titleController.text,
+    text: _textController.text,
+  );
+}
+
+Future<void> _restoreDraft() async {
+  if (widget.materialId != null) {
+    return;
+  }
+
+  final draft = await widget.storageService.loadDraft();
+
+  if (!mounted) {
+    return;
+  }
+
+  if (_titleController.text.trim().isEmpty) {
+    _titleController.text = draft['title'] ?? '';
+  }
+
+  if (_textController.text.trim().isEmpty) {
+    _textController.text = draft['text'] ?? '';
+  }
+}
+
   Future<void> _loadMaterial() async {
     final materialId = widget.materialId;
     if (materialId == null) {
@@ -311,6 +340,7 @@ class _EditorScreenState extends State<EditorScreen> {
     }
 
     setState(() => _editingId = material.id);
+    await widget.storageService.clearDraft();
     _showMessage('Материал сохранен.');
   }
 
