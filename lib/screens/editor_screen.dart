@@ -9,6 +9,7 @@ import '../models/material_model.dart';
 import '../services/spelling_service.dart';
 import '../services/storage_service.dart';
 import '../services/transcription_service.dart';
+import '../services/summarization_service.dart';
 import '../widgets/editor_stats.dart';
 import '../widgets/section_header.dart';
 import '../widgets/spelling_text_controller.dart';
@@ -39,6 +40,7 @@ class _EditorScreenState extends State<EditorScreen> {
   final SpellingTextController _textController = SpellingTextController();
   final SpellingService _spellingService = SpellingService();
   final TranscriptionService _transcriptionService = TranscriptionService();
+  final SummarizationService _summarizationService = SummarizationService();
   final List<SpellingIssue> _spellingIssues = [];
   String? _editingId;
   String? _fileName;
@@ -243,6 +245,50 @@ class _EditorScreenState extends State<EditorScreen> {
     super.dispose();
   }
 
+  void _summarizeText() {
+  final text = _textController.text.trim();
+
+  if (text.isEmpty) {
+    _showMessage('Нет текста для краткого содержания.');
+    return;
+  }
+
+  final summary = _summarizationService.summarize(text);
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Краткое содержание'),
+        content: SingleChildScrollView(
+          child: Text(summary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(
+                ClipboardData(text: summary),
+              );
+
+              if (context.mounted) {
+                Navigator.pop(context);
+                _showMessage('Краткое содержание скопировано.');
+              }
+            },
+            child: const Text('Копировать'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Закрыть'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
   Future<void> _save() async {
     final title = _titleController.text.trim();
     final text = _textController.text.trim();
@@ -363,6 +409,11 @@ class _EditorScreenState extends State<EditorScreen> {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
+                    FilledButton.icon(
+                      onPressed: _summarizeText,
+                      icon: const Icon(Icons.auto_awesome_outlined),
+                      label: const Text('Краткое содержание'),
+                    ),
                     FilledButton.icon(
                       onPressed: _save,
                       icon: const Icon(Icons.save_outlined),
