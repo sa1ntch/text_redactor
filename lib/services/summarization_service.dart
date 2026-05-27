@@ -1,4 +1,31 @@
 class SummarizationService {
+  static const _stopWords = {
+    'что',
+    'это',
+    'как',
+    'для',
+    'она',
+    'они',
+    'ему',
+    'было',
+    'или',
+    'под',
+    'при',
+    'над',
+    'потом',
+    'если',
+    'когда',
+    'только',
+    'потому',
+    'снова',
+    'очень',
+    'просто',
+    'себя',
+    'своей',
+    'свою',
+    'свои',
+  };
+
   String summarize(
     String text, {
     int sentenceCount = 3,
@@ -26,7 +53,7 @@ class SummarizationService {
         .split(RegExp(r'\s+'));
 
     for (final word in words) {
-      if (word.length < 3) {
+      if (word.length < 3 || _stopWords.contains(word)) {
         continue;
       }
 
@@ -35,37 +62,65 @@ class SummarizationService {
 
     final scoredSentences = <Map<String, dynamic>>[];
 
-    for (final sentence in sentences) {
+    for (int i = 0; i < sentences.length; i++) {
+      final sentence = sentences[i];
+
+      // Пропускаем диалоги
+      if (sentence.trim().startsWith('—')) {
+        continue;
+      }
+
       final sentenceWords = sentence
           .toLowerCase()
           .replaceAll(RegExp(r'[^а-яa-z0-9\s]'), '')
           .split(RegExp(r'\s+'));
 
-      int score = 0;
+      double score = 0;
 
       for (final word in sentenceWords) {
         score += wordFrequency[word] ?? 0;
       }
 
+      // Нормализация по длине
+      if (sentenceWords.isNotEmpty) {
+        score /= sentenceWords.length;
+      }
+
+      // Бонус первым и последним предложениям
+      if (i < 3) {
+        score += 3;
+      }
+
+      if (i > sentences.length - 4) {
+        score += 3;
+      }
+
+      // Штраф за слишком короткие предложения
+      if (sentenceWords.length < 6) {
+        score -= 2;
+      }
+
       scoredSentences.add({
         'sentence': sentence,
         'score': score,
+        'index': i,
       });
     }
 
     scoredSentences.sort(
-      (a, b) => (b['score'] as int).compareTo(a['score'] as int),
+      (a, b) => (b['score'] as double).compareTo(a['score'] as double),
     );
 
     final topSentences = scoredSentences
         .take(sentenceCount)
+        .toList();
+
+    topSentences.sort(
+      (a, b) => (a['index'] as int).compareTo(b['index'] as int),
+    );
+
+    return topSentences
         .map((e) => e['sentence'] as String)
-        .toList();
-
-    final orderedSummary = sentences
-        .where((s) => topSentences.contains(s))
-        .toList();
-
-    return orderedSummary.join(' ');
+        .join(' ');
   }
 }
