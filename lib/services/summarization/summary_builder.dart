@@ -46,13 +46,11 @@ class SummaryBuilder {
 
   sentence = _rewriteSentence(sentence);
 
-  // Удаляем слишком длинные вставки
   sentence = sentence.replaceAll(
     RegExp(r'—[^.]*'),
     '',
   );
 
-  // Удаляем разговорные конструкции
   const garbage = [
     'конечно',
     'наверное',
@@ -68,14 +66,6 @@ class SummaryBuilder {
     );
   }
 
-  // Укорачиваем слишком длинные предложения
-  final parts = sentence.split(',');
-
-  if (parts.length > 3) {
-  sentence =
-      '${parts[0]}, ${parts[1]}, ${parts[2]}.';
-}
-
   sentence = sentence
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
@@ -84,7 +74,6 @@ class SummaryBuilder {
     sentence += '.';
   }
 
-  // Заглавная буква
   if (sentence.isNotEmpty) {
     sentence =
         sentence[0].toUpperCase() +
