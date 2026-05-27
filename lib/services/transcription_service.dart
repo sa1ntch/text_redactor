@@ -234,7 +234,9 @@ if (utterances != null && utterances.isNotEmpty) {
   }
 
   return buffer.toString().trim();
-}
+  }
+  return alternative['transcript'] as String? ?? '';
+}  
 
   static String normalizeApiKey(String apiKey) {
     final withoutBearer = apiKey.trim().replaceFirst(
