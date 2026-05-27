@@ -41,12 +41,13 @@
       'self'
       data:;
 
-    connect-src
-      'self'
+    connect-src 'self'
       https://api.deepgram.com
+      https://*.deepgram.com
+      wss://api.deepgram.com
       https://speller.yandex.net
-      https://fonts.gstatic.com
-      https://www.gstatic.com;
+      blob:
+      data:;
 
     worker-src
       'self'
