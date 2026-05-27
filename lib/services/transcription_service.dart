@@ -161,50 +161,79 @@ class TranscriptionService {
   final utterances =
       results?['utterances'] as List<dynamic>?;
 
-  // Если Deepgram вернул utterances
-  if (utterances != null && utterances.isNotEmpty) {
-    final buffer = StringBuffer();
+if (utterances != null && utterances.isNotEmpty) {
+  final buffer = StringBuffer();
 
-    for (final item in utterances) {
-      final utterance =
-          item as Map<String, dynamic>;
+  int? currentSpeaker;
 
-      final speaker =
-          utterance['speaker'] as int? ?? 0;
+  final speakerText = StringBuffer();
 
-      final start =
-          utterance['start'] as num? ?? 0;
+  String currentTimestamp = '';
 
-      final transcript =
-          utterance['transcript'] as String? ?? '';
+  for (final item in utterances) {
+    final utterance =
+        item as Map<String, dynamic>;
 
-      if (transcript.trim().isEmpty) {
-        continue;
-      }
+    final speaker =
+        utterance['speaker'] as int? ?? 0;
 
-      final minutes =
-          (start ~/ 60).toString().padLeft(2, '0');
+    final start =
+        utterance['start'] as num? ?? 0;
 
-      final seconds =
-          (start % 60)
-              .floor()
-              .toString()
-              .padLeft(2, '0');
+    final transcript =
+        utterance['transcript'] as String? ?? '';
 
-      buffer.writeln('[$minutes:$seconds]');
-      buffer.writeln(
-        '[Спикер ${speaker + 1}]',
-      );
-      buffer.writeln();
-      buffer.writeln(transcript.trim());
-      buffer.writeln();
+    if (transcript.trim().isEmpty) {
+      continue;
     }
 
-    return buffer.toString().trim();
+    final minutes =
+        (start ~/ 60).toString().padLeft(2, '0');
+
+    final seconds =
+        (start % 60)
+            .floor()
+            .toString()
+            .padLeft(2, '0');
+
+    final timestamp = '[$minutes:$seconds]';
+
+    if (currentSpeaker != speaker) {
+      if (speakerText.isNotEmpty) {
+        buffer.writeln(currentTimestamp);
+        buffer.writeln(
+          '[Спикер ${currentSpeaker! + 1}]',
+        );
+        buffer.writeln();
+        buffer.writeln(
+          speakerText.toString().trim(),
+        );
+        buffer.writeln();
+
+        speakerText.clear();
+      }
+
+      currentSpeaker = speaker;
+      currentTimestamp = timestamp;
+    }
+
+    speakerText.write('$transcript ');
   }
 
-  // fallback
-  return alternative['transcript'] as String? ?? '';
+  if (speakerText.isNotEmpty &&
+      currentSpeaker != null) {
+    buffer.writeln(currentTimestamp);
+    buffer.writeln(
+      '[Спикер ${currentSpeaker + 1}]',
+    );
+    buffer.writeln();
+    buffer.writeln(
+      speakerText.toString().trim(),
+    );
+    buffer.writeln();
+  }
+
+  return buffer.toString().trim();
 }
 
   static String normalizeApiKey(String apiKey) {
