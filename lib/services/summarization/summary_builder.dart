@@ -45,11 +45,14 @@ class SummaryBuilder {
   var sentence = event.originalSentence;
 
   sentence = _rewriteSentence(sentence);
+
+  // Удаляем слишком длинные вставки
   sentence = sentence.replaceAll(
     RegExp(r'—[^.]*'),
     '',
   );
 
+  // Удаляем разговорные конструкции
   const garbage = [
     'конечно',
     'наверное',
@@ -65,6 +68,7 @@ class SummaryBuilder {
     );
   }
 
+  // Укорачиваем слишком длинные предложения
   final parts = sentence.split(',');
 
   if (parts.length > 2) {
