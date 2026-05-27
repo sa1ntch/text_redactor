@@ -46,11 +46,6 @@ class SummaryBuilder {
 
   sentence = _rewriteSentence(sentence);
 
-  sentence = sentence.replaceAll(
-    RegExp(r'—[^.]*'),
-    '',
-  );
-
   const garbage = [
     'конечно',
     'наверное',
