@@ -166,37 +166,64 @@ class TranscriptionService {
   final buffer = StringBuffer();
 
   for (final paragraphItem in paragraphs) {
-    final paragraph = paragraphItem as Map<String, dynamic>;
+  final paragraph = paragraphItem as Map<String, dynamic>;
 
-    final sentences = paragraph['sentences'] as List<dynamic>?;
+  final sentences = paragraph['sentences'] as List<dynamic>?;
 
-    if (sentences == null || sentences.isEmpty) {
-      continue;
-    }
-
-    final speaker = paragraph['speaker'] ?? 0;
-
-    final start = paragraph['start'] as num? ?? 0;
-
-    final minutes = (start ~/ 60).toString().padLeft(2, '0');
-    final seconds = (start % 60).floor().toString().padLeft(2, '0');
-
-    buffer.writeln('[$minutes:$seconds]');
-    buffer.writeln('[Спикер ${speaker + 1}]');
-    buffer.writeln();
-
-    for (final sentenceItem in sentences) {
-      final sentence = sentenceItem as Map<String, dynamic>;
-
-      final text = sentence['text'] as String? ?? '';
-
-      buffer.writeln(text);
-    }
-
-    buffer.writeln();
+  if (sentences == null || sentences.isEmpty) {
+    continue;
   }
 
-  return buffer.toString().trim();
+  final start = paragraph['start'] as num? ?? 0;
+
+  final minutes = (start ~/ 60).toString().padLeft(2, '0');
+  final seconds = (start % 60).floor().toString().padLeft(2, '0');
+
+  int? currentSpeaker;
+
+  final speakerBuffer = StringBuffer();
+
+  for (final sentenceItem in sentences) {
+    final sentence = sentenceItem as Map<String, dynamic>;
+
+    final text = sentence['text'] as String? ?? '';
+
+    final words =
+        sentence['words'] as List<dynamic>?;
+
+    int detectedSpeaker = 0;
+
+    if (words != null && words.isNotEmpty) {
+      final firstWord =
+          words.first as Map<String, dynamic>;
+
+      detectedSpeaker =
+          firstWord['speaker'] as int? ?? 0;
+    }
+
+    if (currentSpeaker != detectedSpeaker) {
+      if (speakerBuffer.isNotEmpty) {
+        buffer.writeln(speakerBuffer.toString().trim());
+        buffer.writeln();
+        speakerBuffer.clear();
+      }
+
+      currentSpeaker = detectedSpeaker;
+
+      buffer.writeln('[$minutes:$seconds]');
+      buffer.writeln(
+        '[Спикер ${detectedSpeaker + 1}]',
+      );
+      buffer.writeln();
+    }
+
+    speakerBuffer.write('$text ');
+  }
+
+  if (speakerBuffer.isNotEmpty) {
+    buffer.writeln(speakerBuffer.toString().trim());
+    buffer.writeln();
+  }
 }
 
   static String normalizeApiKey(String apiKey) {
