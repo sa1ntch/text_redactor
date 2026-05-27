@@ -19,7 +19,6 @@ class SummaryBuilder {
 
       final concept = _extractConcept(event);
 
-      // Удаляем смысловые дубликаты
       if (usedConcepts.contains(concept)) {
         continue;
       }
@@ -43,42 +42,53 @@ class SummaryBuilder {
   }
 
   String _compressEvent(EventModel event) {
-    final subject = event.subject.trim();
-    final action = event.action.trim();
-    final object = event.object.trim();
+  var sentence = event.originalSentence;
 
-    // Если событие слабое
-    if (action.isEmpty) {
-      return '';
-    }
+  sentence = _rewriteSentence(sentence);
+  sentence = sentence.replaceAll(
+    RegExp(r'—[^.]*'),
+    '',
+  );
 
-    String sentence =
-        '$subject $action $object';
+  const garbage = [
+    'конечно',
+    'наверное',
+    'честно говоря',
+    'как мне кажется',
+    'я уже не помню',
+  ];
 
-    sentence = _rewriteSentence(sentence);
-
-    // Удаляем мусор
+  for (final word in garbage) {
     sentence = sentence.replaceAll(
-      RegExp(r'\s+'),
-      ' ',
+      RegExp(word, caseSensitive: false),
+      '',
     );
-
-    sentence = sentence.trim();
-
-    // Заглавная буква
-    if (sentence.isNotEmpty) {
-      sentence =
-          sentence[0].toUpperCase() +
-          sentence.substring(1);
-    }
-
-    // Точка
-    if (!sentence.endsWith('.')) {
-      sentence += '.';
-    }
-
-    return sentence;
   }
+
+  final parts = sentence.split(',');
+
+  if (parts.length > 2) {
+    sentence =
+        '${parts[0]}, ${parts[1]}.';
+  }
+
+  sentence = sentence
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+
+  if (!sentence.endsWith('.')) {
+    sentence += '.';
+  }
+
+  // Заглавная буква
+  if (sentence.isNotEmpty) {
+    sentence =
+        sentence[0].toUpperCase() +
+        sentence.substring(1);
+  }
+
+  return sentence;
+}
 
   String _rewriteSentence(String sentence) {
     var result = sentence;
@@ -116,7 +126,6 @@ class SummaryBuilder {
       );
     });
 
-    // Удаляем разговорные конструкции
     const garbage = [
       'конечно',
       'наверное',
