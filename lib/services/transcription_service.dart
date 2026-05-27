@@ -18,27 +18,41 @@ class AudioTranscriptionFile {
 }
 
 class TranscriptionService {
-  TranscriptionService({http.Client? client, Duration? requestTimeout})
-    : _client = client ?? http.Client(),
-     _requestTimeout = requestTimeout ?? const Duration(minutes: 15);
+  TranscriptionService({
+    http.Client? client,
+    Duration? requestTimeout,
+  }) : _client = client ?? http.Client(),
+       _requestTimeout =
+           requestTimeout ??
+           const Duration(minutes: 15);
 
-  static const attributionText = 'Транскрибация: Deepgram Speech-to-Text';
+  static const attributionText =
+      'Транскрибация: Deepgram Speech-to-Text';
+
   static const defaultModel = 'nova-3';
-  static const freeTierMaxFileSizeBytes = 2 * 1024 * 1024 * 1024;
+
+  static const freeTierMaxFileSizeBytes =
+      2 * 1024 * 1024 * 1024;
+
   static final attributionUri = Uri.parse(
     'https://developers.deepgram.com/docs/pre-recorded-audio',
   );
-  static final _endpoint = Uri.https('api.deepgram.com', '/v1/listen', {
-  'model': defaultModel,
-  'language': 'ru',
-  'smart_format': 'true',
-  'punctuate': 'true',
-  'diarize': 'true',
-  'paragraphs': 'true',
-  'utterances': 'true',
-});
+
+  static final _endpoint = Uri.https(
+    'api.deepgram.com',
+    '/v1/listen',
+    {
+      'model': defaultModel,
+      'language': 'ru',
+      'smart_format': 'true',
+      'punctuate': 'true',
+      'diarize': 'true',
+      'paragraphs': 'true',
+    },
+  );
 
   final http.Client _client;
+
   final Duration _requestTimeout;
 
   Future<String> transcribe({
@@ -47,12 +61,17 @@ class TranscriptionService {
     String model = defaultModel,
     String language = 'ru',
   }) async {
-    final normalizedApiKey = normalizeApiKey(apiKey);
+    final normalizedApiKey =
+        normalizeApiKey(apiKey);
+
     if (normalizedApiKey.isEmpty) {
-      throw const TranscriptionServiceException('Укажите Deepgram API key.');
+      throw const TranscriptionServiceException(
+        'Укажите Deepgram API key.',
+      );
     }
 
-    if (file.size > freeTierMaxFileSizeBytes) {
+    if (file.size >
+        freeTierMaxFileSizeBytes) {
       throw TranscriptionServiceException(
         'Файл больше 2 GB. Deepgram не принимает такие большие прямые загрузки.',
       );
@@ -60,21 +79,25 @@ class TranscriptionService {
 
     final endpoint = _endpoint.replace(
       queryParameters: {
-      'model': model,
-      'language': language,
-      'smart_format': 'true',
-      'punctuate': 'true',
-      'diarize': 'true',
-      'paragraphs': 'true',
-      'utterances': 'true',
-    },
+        'model': model,
+        'language': language,
+        'smart_format': 'true',
+        'punctuate': 'true',
+        'diarize': 'true',
+        'paragraphs': 'true',
+      },
     );
 
     final bytes = file.bytes;
+
     final path = file.path;
-    final request = http.Request('POST', endpoint)
-      ..headers['Authorization'] = 'Token $normalizedApiKey'
-      ..headers['Content-Type'] = _contentTypeFor(file.name);
+
+    final request =
+        http.Request('POST', endpoint)
+          ..headers['Authorization'] =
+              'Token $normalizedApiKey'
+          ..headers['Content-Type'] =
+              _contentTypeFor(file.name);
 
     if (bytes != null) {
       request.bodyBytes = bytes;
@@ -85,9 +108,12 @@ class TranscriptionService {
             path,
             filename: file.name,
           ).then(
-            (file) => file.finalize().fold<List<int>>(
+            (file) => file.finalize().fold<
+              List<int>
+            >(
               <int>[],
-              (previous, element) => previous..addAll(element),
+              (previous, element) =>
+                  previous..addAll(element),
             ),
           );
     } else {
@@ -106,23 +132,31 @@ class TranscriptionService {
             );
           },
         );
-    final body = await response.stream.bytesToString().timeout(
-      _requestTimeout,
-      onTimeout: () {
-        throw const TranscriptionServiceException(
-          'Deepgram начал ответ, но не завершил его вовремя. Попробуйте еще раз.',
-        );
-      },
-    );
+
+    final body =
+        await response.stream
+            .bytesToString()
+            .timeout(
+              _requestTimeout,
+              onTimeout: () {
+                throw const TranscriptionServiceException(
+                  'Deepgram начал ответ, но не завершил его вовремя. Попробуйте еще раз.',
+                );
+              },
+            );
 
     if (response.statusCode != 200) {
       throw TranscriptionServiceException(
-        _extractErrorMessage(body, response.statusCode) ??
+        _extractErrorMessage(
+              body,
+              response.statusCode,
+            ) ??
             'Deepgram Speech-to-Text вернул код ${response.statusCode}.',
       );
     }
 
     final text = parseTranscription(body);
+
     if (text.trim().isEmpty) {
       throw const TranscriptionServiceException(
         'Deepgram вернул пустую транскрибацию.',
@@ -136,143 +170,184 @@ class TranscriptionService {
     _client.close();
   }
 
-  static String parseTranscription(String body) {
-  final decoded = jsonDecode(body) as Map<String, dynamic>;
+  static String parseTranscription(
+    String body,
+  ) {
+    final decoded =
+        jsonDecode(body)
+            as Map<String, dynamic>;
 
-  final results = decoded['results'] as Map<String, dynamic>?;
-  final channels = results?['channels'] as List<dynamic>?;
+    final results =
+        decoded['results']
+            as Map<String, dynamic>?;
 
-  if (channels == null || channels.isEmpty) {
-    return '';
-  }
+    final channels =
+        results?['channels']
+            as List<dynamic>?;
 
-  final channel = channels.first as Map<String, dynamic>;
-
-  final alternatives =
-      channel['alternatives'] as List<dynamic>?;
-
-  if (alternatives == null || alternatives.isEmpty) {
-    return '';
-  }
-
-  final alternative =
-      alternatives.first as Map<String, dynamic>;
-
-  final utterances =
-      results?['utterances'] as List<dynamic>?;
-
-if (utterances != null && utterances.isNotEmpty) {
-  final buffer = StringBuffer();
-
-  int? currentSpeaker;
-
-  final speakerText = StringBuffer();
-
-  String currentTimestamp = '';
-
-  for (final item in utterances) {
-    final utterance =
-        item as Map<String, dynamic>;
-
-    final speaker =
-        utterance['speaker'] as int? ?? 0;
-
-    final start =
-        utterance['start'] as num? ?? 0;
-
-    final transcript =
-        utterance['transcript'] as String? ?? '';
-
-    if (transcript.trim().isEmpty) {
-      continue;
+    if (channels == null ||
+        channels.isEmpty) {
+      return '';
     }
 
-    final minutes =
-        (start ~/ 60).toString().padLeft(2, '0');
+    final channel =
+        channels.first
+            as Map<String, dynamic>;
 
-    final seconds =
-        (start % 60)
-            .floor()
-            .toString()
-            .padLeft(2, '0');
+    final alternatives =
+        channel['alternatives']
+            as List<dynamic>?;
 
-    final timestamp = '[$minutes:$seconds]';
+    if (alternatives == null ||
+        alternatives.isEmpty) {
+      return '';
+    }
 
-    if (currentSpeaker != speaker) {
-      if (speakerText.isNotEmpty) {
-        buffer.writeln(currentTimestamp);
-        buffer.writeln(
-          '[Спикер ${currentSpeaker! + 1}]',
-        );
-        buffer.writeln();
-        buffer.writeln(
-          speakerText.toString().trim(),
-        );
-        buffer.writeln();
+    final alternative =
+        alternatives.first
+            as Map<String, dynamic>;
 
-        speakerText.clear();
+    final paragraphsData =
+        alternative['paragraphs']
+            as Map<String, dynamic>?;
+
+    final paragraphs =
+        paragraphsData?['paragraphs']
+            as List<dynamic>?;
+
+    if (paragraphs == null ||
+        paragraphs.isEmpty) {
+      return alternative['transcript']
+              as String? ??
+          '';
+    }
+
+    final buffer = StringBuffer();
+
+    for (final paragraphItem
+        in paragraphs) {
+      final paragraph =
+          paragraphItem
+              as Map<String, dynamic>;
+
+      final text =
+          paragraph['sentences'] != null
+              ? (paragraph['sentences']
+                      as List<dynamic>)
+                  .map(
+                    (s) =>
+                        (s as Map<String, dynamic>)['text']
+                            as String? ??
+                        '',
+                  )
+                  .join(' ')
+              : '';
+
+      if (text.trim().isEmpty) {
+        continue;
       }
 
-      currentSpeaker = speaker;
-      currentTimestamp = timestamp;
+      final start =
+          paragraph['start']
+              as num? ??
+          0;
+
+      final minutes =
+          (start ~/ 60)
+              .toString()
+              .padLeft(2, '0');
+
+      final seconds =
+          (start % 60)
+              .floor()
+              .toString()
+              .padLeft(2, '0');
+
+      buffer.writeln(
+        '[$minutes:$seconds]',
+      );
+
+      buffer.writeln('[Спикер]');
+
+      buffer.writeln();
+
+      buffer.writeln(text.trim());
+
+      buffer.writeln();
     }
 
-    speakerText.write('$transcript ');
+    return buffer.toString().trim();
   }
 
-  if (speakerText.isNotEmpty &&
-      currentSpeaker != null) {
-    buffer.writeln(currentTimestamp);
-    buffer.writeln(
-      '[Спикер ${currentSpeaker + 1}]',
-    );
-    buffer.writeln();
-    buffer.writeln(
-      speakerText.toString().trim(),
-    );
-    buffer.writeln();
-  }
+  static String normalizeApiKey(
+    String apiKey,
+  ) {
+    final withoutBearer =
+        apiKey.trim().replaceFirst(
+          RegExp(
+            r'^(Bearer|Token)\s+',
+            caseSensitive: false,
+          ),
+          '',
+        );
 
-  return buffer.toString().trim();
-  }
-  return alternative['transcript'] as String? ?? '';
-}  
-
-  static String normalizeApiKey(String apiKey) {
-    final withoutBearer = apiKey.trim().replaceFirst(
-      RegExp(r'^(Bearer|Token)\s+', caseSensitive: false),
+    return withoutBearer.replaceAll(
+      RegExp(r'\s+'),
       '',
     );
-    return withoutBearer.replaceAll(RegExp(r'\s+'), '');
   }
 
-  static String describeApiKey(String apiKey) {
-    final normalized = normalizeApiKey(apiKey);
+  static String describeApiKey(
+    String apiKey,
+  ) {
+    final normalized =
+        normalizeApiKey(apiKey);
+
     if (normalized.isEmpty) {
       return 'Ключ не задан';
     }
 
-    final suffixLength = normalized.length < 4 ? normalized.length : 4;
-    final suffix = normalized.substring(normalized.length - suffixLength);
+    final suffixLength =
+        normalized.length < 4
+            ? normalized.length
+            : 4;
+
+    final suffix = normalized.substring(
+      normalized.length - suffixLength,
+    );
+
     return 'Ключ: ...$suffix, ${normalized.length} символов';
   }
 
-  static String? _extractErrorMessage(String body, int statusCode) {
+  static String? _extractErrorMessage(
+    String body,
+    int statusCode,
+  ) {
     try {
-      final decoded = jsonDecode(body) as Map<String, dynamic>;
+      final decoded =
+          jsonDecode(body)
+              as Map<String, dynamic>;
+
       final error = decoded['error'];
+
       if (error is String) {
-        if (statusCode == 401 || statusCode == 403) {
+        if (statusCode == 401 ||
+            statusCode == 403) {
           return 'Deepgram не принял API key. Проверьте, что ключ активен в Deepgram Console.';
         }
+
         return error;
       }
 
       if (error is Map<String, dynamic>) {
-        final code = error['code'] as String?;
-        final message = error['message'] as String?;
+        final code =
+            error['code'] as String?;
 
-        if (statusCode == 401 || statusCode == 403) {
+        final message =
+            error['message'] as String?;
+
+        if (statusCode == 401 ||
+            statusCode == 403) {
           return 'Deepgram не принял API key. Проверьте, что ключ активен в Deepgram Console.';
         }
 
@@ -285,11 +360,21 @@ if (utterances != null && utterances.isNotEmpty) {
     return null;
   }
 
-  static String _contentTypeFor(String fileName) {
-    final extension = fileName.split('.').last.toLowerCase();
+  static String _contentTypeFor(
+    String fileName,
+  ) {
+    final extension =
+        fileName
+            .split('.')
+            .last
+            .toLowerCase();
+
     return switch (extension) {
       'flac' => 'audio/flac',
-      'mp3' || 'mpeg' || 'mpga' => 'audio/mpeg',
+      'mp3' ||
+      'mpeg' ||
+      'mpga' =>
+        'audio/mpeg',
       'm4a' || 'mp4' => 'audio/mp4',
       'ogg' => 'audio/ogg',
       'wav' => 'audio/wav',
@@ -299,8 +384,11 @@ if (utterances != null && utterances.isNotEmpty) {
   }
 }
 
-class TranscriptionServiceException implements Exception {
-  const TranscriptionServiceException(this.message);
+class TranscriptionServiceException
+    implements Exception {
+  const TranscriptionServiceException(
+    this.message,
+  );
 
   final String message;
 
