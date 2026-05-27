@@ -33,6 +33,8 @@ class TranscriptionService {
     'language': 'ru',
     'smart_format': 'true',
     'punctuate': 'true',
+    'diarize': 'true',
+    'paragraphs': 'true',
   });
 
   final http.Client _client;
@@ -61,6 +63,8 @@ class TranscriptionService {
         'language': language,
         'smart_format': 'true',
         'punctuate': 'true',
+        'diarize': 'true',
+        'paragraphs': 'true',
       },
     );
 
@@ -131,22 +135,69 @@ class TranscriptionService {
   }
 
   static String parseTranscription(String body) {
-    final decoded = jsonDecode(body) as Map<String, dynamic>;
-    final results = decoded['results'] as Map<String, dynamic>?;
-    final channels = results?['channels'] as List<dynamic>?;
-    if (channels == null || channels.isEmpty) {
-      return '';
-    }
+  final decoded = jsonDecode(body) as Map<String, dynamic>;
 
-    final channel = channels.first as Map<String, dynamic>;
-    final alternatives = channel['alternatives'] as List<dynamic>?;
-    if (alternatives == null || alternatives.isEmpty) {
-      return '';
-    }
+  final results = decoded['results'] as Map<String, dynamic>?;
+  final channels = results?['channels'] as List<dynamic>?;
 
-    final alternative = alternatives.first as Map<String, dynamic>;
+  if (channels == null || channels.isEmpty) {
+    return '';
+  }
+
+  final channel = channels.first as Map<String, dynamic>;
+  final alternatives = channel['alternatives'] as List<dynamic>?;
+
+  if (alternatives == null || alternatives.isEmpty) {
+    return '';
+  }
+
+  final alternative = alternatives.first as Map<String, dynamic>;
+
+  final paragraphsData =
+      alternative['paragraphs'] as Map<String, dynamic>?;
+
+  final paragraphs =
+      paragraphsData?['paragraphs'] as List<dynamic>?;
+
+  if (paragraphs == null || paragraphs.isEmpty) {
     return alternative['transcript'] as String? ?? '';
   }
+
+  final buffer = StringBuffer();
+
+  for (final paragraphItem in paragraphs) {
+    final paragraph = paragraphItem as Map<String, dynamic>;
+
+    final sentences = paragraph['sentences'] as List<dynamic>?;
+
+    if (sentences == null || sentences.isEmpty) {
+      continue;
+    }
+
+    final speaker = paragraph['speaker'] ?? 0;
+
+    final start = paragraph['start'] as num? ?? 0;
+
+    final minutes = (start ~/ 60).toString().padLeft(2, '0');
+    final seconds = (start % 60).floor().toString().padLeft(2, '0');
+
+    buffer.writeln('[$minutes:$seconds]');
+    buffer.writeln('[Спикер ${speaker + 1}]');
+    buffer.writeln();
+
+    for (final sentenceItem in sentences) {
+      final sentence = sentenceItem as Map<String, dynamic>;
+
+      final text = sentence['text'] as String? ?? '';
+
+      buffer.writeln(text);
+    }
+
+    buffer.writeln();
+  }
+
+  return buffer.toString().trim();
+}
 
   static String normalizeApiKey(String apiKey) {
     final withoutBearer = apiKey.trim().replaceFirst(
