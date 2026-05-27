@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
 
 import '../models/material_model.dart';
@@ -44,6 +46,43 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
     ).showSnackBar(const SnackBar(content: Text('Материал удален.')));
   }
 
+  String _cleanTranscript(String text) {
+  return text
+      .replaceAll(
+        RegExp(r'\[\d{2}:\d{2}:\d{2}\]'),
+        '',
+      )
+      .replaceAll(
+        RegExp(r'\[Спикер \d+\]'),
+        '',
+      )
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
+}
+
+void _exportTxt(MaterialModel material) {
+  final cleanedText = _cleanTranscript(material.text);
+
+  final content =
+      '${material.title}\n\n$cleanedText';
+
+  final bytes = utf8.encode(content);
+
+  final blob = html.Blob([bytes]);
+
+  final url = html.Url.createObjectUrlFromBlob(blob);
+
+  final anchor =
+      html.AnchorElement(href: url)
+        ..setAttribute(
+          'download',
+          '${material.title}.txt',
+        )
+        ..click();
+
+  html.Url.revokeObjectUrl(url);
+}
+  
   String _formatDate(DateTime date) {
     final day = date.day.toString().padLeft(2, '0');
     final month = date.month.toString().padLeft(2, '0');
@@ -120,6 +159,11 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                               spacing: 8,
                               runSpacing: 8,
                               children: [
+                                OutlinedButton.icon(
+                                onPressed: () => _exportTxt(material),
+                                icon: const Icon(Icons.download_outlined),
+                                label: const Text('TXT'),
+                                ),
                                 OutlinedButton.icon(
                                   onPressed: () =>
                                       widget.onOpenMaterial(material.id),
