@@ -29,13 +29,14 @@ class TranscriptionService {
     'https://developers.deepgram.com/docs/pre-recorded-audio',
   );
   static final _endpoint = Uri.https('api.deepgram.com', '/v1/listen', {
-    'model': defaultModel,
-    'language': 'ru',
-    'smart_format': 'true',
-    'punctuate': 'true',
-    'diarize': 'true',
-    'paragraphs': 'true',
-  });
+  'model': defaultModel,
+  'language': 'ru',
+  'smart_format': 'true',
+  'punctuate': 'true',
+  'diarize': 'true',
+  'paragraphs': 'true',
+  'utterances': 'true',
+});
 
   final http.Client _client;
   final Duration _requestTimeout;
@@ -59,13 +60,14 @@ class TranscriptionService {
 
     final endpoint = _endpoint.replace(
       queryParameters: {
-        'model': model,
-        'language': language,
-        'smart_format': 'true',
-        'punctuate': 'true',
-        'diarize': 'true',
-        'paragraphs': 'true',
-      },
+      'model': model,
+      'language': language,
+      'smart_format': 'true',
+      'punctuate': 'true',
+      'diarize': 'true',
+      'paragraphs': 'true',
+      'utterances': 'true',
+    },
     );
 
     final bytes = file.bytes;
@@ -145,88 +147,64 @@ class TranscriptionService {
   }
 
   final channel = channels.first as Map<String, dynamic>;
-  final alternatives = channel['alternatives'] as List<dynamic>?;
+
+  final alternatives =
+      channel['alternatives'] as List<dynamic>?;
 
   if (alternatives == null || alternatives.isEmpty) {
     return '';
   }
 
-  final alternative = alternatives.first as Map<String, dynamic>;
+  final alternative =
+      alternatives.first as Map<String, dynamic>;
 
-  final paragraphsData =
-      alternative['paragraphs'] as Map<String, dynamic>?;
+  final utterances =
+      results?['utterances'] as List<dynamic>?;
 
-  final paragraphs =
-      paragraphsData?['paragraphs'] as List<dynamic>?;
+  // Если Deepgram вернул utterances
+  if (utterances != null && utterances.isNotEmpty) {
+    final buffer = StringBuffer();
 
-  if (paragraphs == null || paragraphs.isEmpty) {
-    return alternative['transcript'] as String? ?? '';
-  }
+    for (final item in utterances) {
+      final utterance =
+          item as Map<String, dynamic>;
 
-  final buffer = StringBuffer();
+      final speaker =
+          utterance['speaker'] as int? ?? 0;
 
-  for (final paragraphItem in paragraphs) {
-  final paragraph = paragraphItem as Map<String, dynamic>;
+      final start =
+          utterance['start'] as num? ?? 0;
 
-  final sentences = paragraph['sentences'] as List<dynamic>?;
+      final transcript =
+          utterance['transcript'] as String? ?? '';
 
-  if (sentences == null || sentences.isEmpty) {
-    continue;
-  }
-
-  final start = paragraph['start'] as num? ?? 0;
-
-  final minutes = (start ~/ 60).toString().padLeft(2, '0');
-  final seconds = (start % 60).floor().toString().padLeft(2, '0');
-
-  int? currentSpeaker;
-
-  final speakerBuffer = StringBuffer();
-
-  for (final sentenceItem in sentences) {
-    final sentence = sentenceItem as Map<String, dynamic>;
-
-    final text = sentence['text'] as String? ?? '';
-
-    final words =
-        sentence['words'] as List<dynamic>?;
-
-    int detectedSpeaker = 0;
-
-    if (words != null && words.isNotEmpty) {
-      final firstWord =
-          words.first as Map<String, dynamic>;
-
-      detectedSpeaker =
-          firstWord['speaker'] as int? ?? 0;
-    }
-
-    if (currentSpeaker != detectedSpeaker) {
-      if (speakerBuffer.isNotEmpty) {
-        buffer.writeln(speakerBuffer.toString().trim());
-        buffer.writeln();
-        speakerBuffer.clear();
+      if (transcript.trim().isEmpty) {
+        continue;
       }
 
-      currentSpeaker = detectedSpeaker;
+      final minutes =
+          (start ~/ 60).toString().padLeft(2, '0');
+
+      final seconds =
+          (start % 60)
+              .floor()
+              .toString()
+              .padLeft(2, '0');
 
       buffer.writeln('[$minutes:$seconds]');
       buffer.writeln(
-        '[Спикер ${detectedSpeaker + 1}]',
+        '[Спикер ${speaker + 1}]',
       );
+      buffer.writeln();
+      buffer.writeln(transcript.trim());
       buffer.writeln();
     }
 
-    speakerBuffer.write('$text ');
+    return buffer.toString().trim();
   }
 
-  if (speakerBuffer.isNotEmpty) {
-  buffer.writeln(speakerBuffer.toString().trim());
-  buffer.writeln();
-}
-}
-
-return buffer.toString().trim();
+  // fallback
+  return alternative['transcript'] as String? ?? '';
 }
 
   static String normalizeApiKey(String apiKey) {
