@@ -1,9 +1,11 @@
 import 'event_extractor.dart';
 import 'semantic_ranker.dart';
+import 'summary_builder.dart';
 
 class SummarizationService {
   final _extractor = EventExtractor();
   final _ranker = SemanticRanker();
+  final _builder = SummaryBuilder();
 
   String summarize(String text) {
     final events = _extractor.extractEvents(text);
@@ -17,10 +19,8 @@ class SummarizationService {
       text,
     );
 
-    final topEvents = rankedEvents.take(3).toList();
-
-    return topEvents
-        .map((e) => e.originalSentence)
-        .join(' ');
+    return _builder.buildSummary(
+      rankedEvents,
+    );
   }
 }
