@@ -71,10 +71,10 @@ class SummaryBuilder {
   // Укорачиваем слишком длинные предложения
   final parts = sentence.split(',');
 
-  if (parts.length > 2) {
-    sentence =
-        '${parts[0]}, ${parts[1]}.';
-  }
+  if (parts.length > 3) {
+  sentence =
+      '${parts[0]}, ${parts[1]}, ${parts[2]}.';
+}
 
   sentence = sentence
       .replaceAll(RegExp(r'\s+'), ' ')
@@ -152,7 +152,9 @@ class SummaryBuilder {
 
   String _cleanup(String text) {
     return text
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .replaceAll(RegExp(r'\s+\.'), '.')
+    .replaceAll(RegExp(r'\s+,'), ',')
+    .trim();
   }
 }
