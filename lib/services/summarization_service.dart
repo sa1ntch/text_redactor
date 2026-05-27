@@ -26,6 +26,19 @@ class SummarizationService {
     'свои',
   };
 
+  static const _importantWords = {
+    'поэтому',
+    'в итоге',
+    'позже',
+    'после',
+    'затем',
+    'благодаря',
+    'решили',
+    'поняли',
+    'помощь',
+    'поддержка',
+  };
+
   String summarize(
     String text, {
     int sentenceCount = 3,
@@ -63,10 +76,12 @@ class SummarizationService {
     final scoredSentences = <Map<String, dynamic>>[];
 
     for (int i = 0; i < sentences.length; i++) {
-      final sentence = sentences[i];
+      final sentence = sentences[i].trim();
 
-      // Пропускаем диалоги
-      if (sentence.trim().startsWith('—')) {
+      // Пропускаем диалоги и цитаты
+      if (sentence.startsWith('—') ||
+          sentence.contains('«') ||
+          sentence.contains('»')) {
         continue;
       }
 
@@ -81,22 +96,29 @@ class SummarizationService {
         score += wordFrequency[word] ?? 0;
       }
 
-      // Нормализация по длине
+      // Нормализация
       if (sentenceWords.isNotEmpty) {
         score /= sentenceWords.length;
       }
 
-      // Бонус первым и последним предложениям
+      // Бонус за начало и конец
       if (i < 3) {
-        score += 3;
+        score += 2;
       }
 
-      if (i > sentences.length - 4) {
-        score += 3;
+      if (i > sentences.length - 5) {
+        score += 2;
       }
 
-      // Штраф за слишком короткие предложения
-      if (sentenceWords.length < 6) {
+      // Бонус за смысловые слова
+      for (final keyword in _importantWords) {
+        if (sentence.toLowerCase().contains(keyword)) {
+          score += 3;
+        }
+      }
+
+      // Штраф коротким предложениям
+      if (sentenceWords.length < 7) {
         score -= 2;
       }
 
@@ -108,19 +130,37 @@ class SummarizationService {
     }
 
     scoredSentences.sort(
-      (a, b) => (b['score'] as double).compareTo(a['score'] as double),
+      (a, b) => (b['score'] as double)
+          .compareTo(a['score'] as double),
     );
 
-    final topSentences = scoredSentences
+    final selected = scoredSentences
         .take(sentenceCount)
         .toList();
 
-    topSentences.sort(
-      (a, b) => (a['index'] as int).compareTo(b['index'] as int),
+    selected.sort(
+      (a, b) => (a['index'] as int)
+          .compareTo(b['index'] as int),
     );
 
-    return topSentences
-        .map((e) => e['sentence'] as String)
+    final summary = selected
+        .map((e) => _rewriteSentence(e['sentence'] as String))
         .join(' ');
+
+    return summary;
+  }
+
+  String _rewriteSentence(String sentence) {
+    var result = sentence;
+
+    result = result.replaceAll(RegExp(r'\bя\b', caseSensitive: false), 'автор');
+    result = result.replaceAll(RegExp(r'\bмы\b', caseSensitive: false), 'они');
+    result = result.replaceAll(RegExp(r'\bмне\b', caseSensitive: false), 'ей');
+    result = result.replaceAll(RegExp(r'\bмой\b', caseSensitive: false), 'её');
+
+    // Удаление лишних пробелов
+    result = result.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    return result;
   }
 }
