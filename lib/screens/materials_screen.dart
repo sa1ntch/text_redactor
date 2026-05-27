@@ -45,7 +45,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
       context,
     ).showSnackBar(const SnackBar(content: Text('Материал удален.')));
   }
-
+  
   String _cleanTranscript(String text) {
   return text
       .replaceAll(
