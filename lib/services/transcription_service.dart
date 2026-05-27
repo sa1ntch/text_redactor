@@ -221,9 +221,12 @@ class TranscriptionService {
   }
 
   if (speakerBuffer.isNotEmpty) {
-    buffer.writeln(speakerBuffer.toString().trim());
-    buffer.writeln();
-  }
+  buffer.writeln(speakerBuffer.toString().trim());
+  buffer.writeln();
+}
+}
+
+return buffer.toString().trim();
 }
 
   static String normalizeApiKey(String apiKey) {
