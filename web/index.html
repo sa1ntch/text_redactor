@@ -16,6 +16,19 @@
   -->
   <base href="/text_redactor/">
 
+  <meta
+  http-equiv="Content-Security-Policy"
+  content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data:;
+    connect-src 'self'
+      https://api.deepgram.com
+      https://speller.yandex.net;
+  "
+  >
+
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Text redactor for magazine">
