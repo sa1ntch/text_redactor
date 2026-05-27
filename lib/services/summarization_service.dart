@@ -24,19 +24,30 @@ class SummarizationService {
     'своей',
     'свою',
     'свои',
+    'этот',
+    'того',
+    'который',
+    'которая',
+    'которые',
   };
 
   static const _importantWords = {
-    'поэтому',
+    'помню',
+    'работали',
+    'война',
+    'эшелоны',
+    'станция',
+    'госпиталь',
+    'немцы',
+    'детство',
+    'праздник',
+    'помощь',
+    'решили',
+    'получили',
+    'поддержала',
     'в итоге',
     'позже',
     'после',
-    'затем',
-    'благодаря',
-    'решили',
-    'поняли',
-    'помощь',
-    'поддержка',
   };
 
   String summarize(
@@ -50,6 +61,7 @@ class SummarizationService {
     }
 
     final sentences = normalized
+        .replaceAll('\n', ' ')
         .split(RegExp(r'(?<=[.!?])\s+'))
         .where((s) => s.trim().isNotEmpty)
         .toList();
@@ -78,10 +90,18 @@ class SummarizationService {
     for (int i = 0; i < sentences.length; i++) {
       final sentence = sentences[i].trim();
 
-      // Пропускаем диалоги и цитаты
-      if (sentence.startsWith('—') ||
-          sentence.contains('«') ||
-          sentence.contains('»')) {
+      // Пропускаем вопросы
+      if (sentence.contains('?')) {
+        continue;
+      }
+
+      // Пропускаем прямую речь
+      if (sentence.startsWith('—')) {
+        continue;
+      }
+
+      // Пропускаем цитаты
+      if (sentence.contains('«') || sentence.contains('»')) {
         continue;
       }
 
@@ -92,6 +112,7 @@ class SummarizationService {
 
       double score = 0;
 
+      // Частотный анализ
       for (final word in sentenceWords) {
         score += wordFrequency[word] ?? 0;
       }
@@ -101,13 +122,9 @@ class SummarizationService {
         score /= sentenceWords.length;
       }
 
-      // Бонус за начало и конец
-      if (i < 3) {
-        score += 2;
-      }
-
-      if (i > sentences.length - 5) {
-        score += 2;
+      // Бонус за narrative sentences
+      if (_containsNarrativeWords(sentence)) {
+        score += 4;
       }
 
       // Бонус за смысловые слова
@@ -117,9 +134,15 @@ class SummarizationService {
         }
       }
 
+      // Бонус за середину текста
+      if (i > sentences.length * 0.2 &&
+          i < sentences.length * 0.8) {
+        score += 2;
+      }
+
       // Штраф коротким предложениям
       if (sentenceWords.length < 7) {
-        score -= 2;
+        score -= 3;
       }
 
       scoredSentences.add({
@@ -130,8 +153,8 @@ class SummarizationService {
     }
 
     scoredSentences.sort(
-      (a, b) => (b['score'] as double)
-          .compareTo(a['score'] as double),
+      (a, b) =>
+          (b['score'] as double).compareTo(a['score'] as double),
     );
 
     final selected = scoredSentences
@@ -139,28 +162,95 @@ class SummarizationService {
         .toList();
 
     selected.sort(
-      (a, b) => (a['index'] as int)
-          .compareTo(b['index'] as int),
+      (a, b) =>
+          (a['index'] as int).compareTo(b['index'] as int),
     );
 
     final summary = selected
         .map((e) => _rewriteSentence(e['sentence'] as String))
         .join(' ');
 
-    return summary;
+    return _cleanupSummary(summary);
+  }
+
+  bool _containsNarrativeWords(String sentence) {
+    const narrativeWords = [
+      'помню',
+      'работал',
+      'работали',
+      'жил',
+      'жили',
+      'ходил',
+      'ходили',
+      'получили',
+      'решили',
+      'происходило',
+      'началась',
+      'закончилась',
+      'было',
+      'стало',
+      'шли',
+      'привозили',
+      'увозили',
+      'вспоминал',
+    ];
+
+    final lower = sentence.toLowerCase();
+
+    for (final word in narrativeWords) {
+      if (lower.contains(word)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   String _rewriteSentence(String sentence) {
     var result = sentence;
 
-    result = result.replaceAll(RegExp(r'\bя\b', caseSensitive: false), 'автор');
-    result = result.replaceAll(RegExp(r'\bмы\b', caseSensitive: false), 'они');
-    result = result.replaceAll(RegExp(r'\bмне\b', caseSensitive: false), 'ей');
-    result = result.replaceAll(RegExp(r'\bмой\b', caseSensitive: false), 'её');
+    result = result.replaceAll(
+      RegExp(r'\bя\b', caseSensitive: false),
+      'он',
+    );
 
-    // Удаление лишних пробелов
-    result = result.replaceAll(RegExp(r'\s+'), ' ').trim();
+    result = result.replaceAll(
+      RegExp(r'\bмы\b', caseSensitive: false),
+      'они',
+    );
 
-    return result;
+    result = result.replaceAll(
+      RegExp(r'\bмне\b', caseSensitive: false),
+      'ему',
+    );
+
+    result = result.replaceAll(
+      RegExp(r'\bмой\b', caseSensitive: false),
+      'его',
+    );
+
+    result = result.replaceAll(
+      RegExp(r'\bмоя\b', caseSensitive: false),
+      'его',
+    );
+
+    result = result.replaceAll(
+      RegExp(r'\bнаверное\b', caseSensitive: false),
+      '',
+    );
+
+    return result.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  String _cleanupSummary(String text) {
+    var result = text;
+
+    // Удаление двойных пробелов
+    result = result.replaceAll(RegExp(r'\s+'), ' ');
+
+    // Удаление повторяющихся точек
+    result = result.replaceAll(RegExp(r'\.\.+'), '.');
+
+    return result.trim();
   }
 }
