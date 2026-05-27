@@ -20,7 +20,7 @@ class AudioTranscriptionFile {
 class TranscriptionService {
   TranscriptionService({http.Client? client, Duration? requestTimeout})
     : _client = client ?? http.Client(),
-      _requestTimeout = _requestTimeout ?? const Duration(minutes: 15);
+     _requestTimeout = requestTimeout ?? const Duration(minutes: 15);
 
   static const attributionText = 'Транскрибация: Deepgram Speech-to-Text';
   static const defaultModel = 'nova-3';
