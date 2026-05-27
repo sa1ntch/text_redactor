@@ -54,6 +54,35 @@ class StorageService {
     return null;
   }
 
+  static const _draftTitleKey = 'draft_title';
+static const _draftTextKey = 'draft_text';
+
+Future<void> saveDraft({
+  required String title,
+  required String text,
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+
+  await prefs.setString(_draftTitleKey, title);
+  await prefs.setString(_draftTextKey, text);
+}
+
+Future<Map<String, String>> loadDraft() async {
+  final prefs = await SharedPreferences.getInstance();
+
+  return {
+    'title': prefs.getString(_draftTitleKey) ?? '',
+    'text': prefs.getString(_draftTextKey) ?? '',
+  };
+}
+
+Future<void> clearDraft() async {
+  final prefs = await SharedPreferences.getInstance();
+
+  await prefs.remove(_draftTitleKey);
+  await prefs.remove(_draftTextKey);
+}
+
   Future<void> _persist(List<MaterialModel> materials) async {
     final prefs = await SharedPreferences.getInstance();
     final encoded = jsonEncode(
