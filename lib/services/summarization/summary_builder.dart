@@ -2,124 +2,135 @@ import 'models/event_model.dart';
 
 class SummaryBuilder {
   String buildSummary(List<EventModel> events) {
-  if (events.isEmpty) {
-    return 'Не удалось сформировать краткое содержание.';
+    if (events.isEmpty) {
+      return 'Не удалось сформировать краткое содержание.';
+    }
+
+    final buffer = StringBuffer();
+
+    final usedConcepts = <String>{};
+
+    int added = 0;
+
+    for (final event in events) {
+      if (added >= 4) {
+        break;
+      }
+
+      final concept = _extractConcept(event);
+
+      // Удаляем смысловые дубликаты
+      if (usedConcepts.contains(concept)) {
+        continue;
+      }
+
+      usedConcepts.add(concept);
+
+      final rewritten = _compressEvent(event);
+
+      if (rewritten.isNotEmpty) {
+        buffer.write('$rewritten ');
+        added++;
+      }
+    }
+
+    return _cleanup(buffer.toString());
   }
 
-  final buffer = StringBuffer();
+  String _extractConcept(EventModel event) {
+    return '${event.subject}_${event.action}'
+        .toLowerCase();
+  }
 
-  final usedTopics = <String>{};
+  String _compressEvent(EventModel event) {
+    final subject = event.subject.trim();
+    final action = event.action.trim();
+    final object = event.object.trim();
 
-  int added = 0;
-
-  for (final event in events) {
-    if (added >= 4) {
-      break;
+    // Если событие слабое
+    if (action.isEmpty) {
+      return '';
     }
 
-    final topic = _detectTopic(event);
+    String sentence =
+        '$subject $action $object';
 
-    String sentence = '';
+    sentence = _rewriteSentence(sentence);
 
-    // Первые 2 темы — semantic rewrite
-    if (!usedTopics.contains(topic)) {
-      sentence = _buildNarrativeSentence(
-        event,
-        topic,
-      );
+    // Удаляем мусор
+    sentence = sentence.replaceAll(
+      RegExp(r'\s+'),
+      ' ',
+    );
 
-      usedTopics.add(topic);
-    } else {
-      // Остальные — rewrite original sentence
-      sentence = _rewriteSentence(
-        event.originalSentence,
-      );
-    }
+    sentence = sentence.trim();
 
+    // Заглавная буква
     if (sentence.isNotEmpty) {
-      buffer.write('$sentence ');
-      added++;
-    }
-  }
-
-  return _cleanup(buffer.toString());
-}
-
-  String _detectTopic(EventModel event) {
-    final text =
-        '${event.subject} ${event.object}'
-            .toLowerCase();
-
-    if (text.contains('станц') ||
-        text.contains('эшелон') ||
-        text.contains('поезд')) {
-      return 'transport';
+      sentence =
+          sentence[0].toUpperCase() +
+          sentence.substring(1);
     }
 
-    if (text.contains('сем') ||
-        text.contains('родител') ||
-        text.contains('дом')) {
-      return 'family';
+    // Точка
+    if (!sentence.endsWith('.')) {
+      sentence += '.';
     }
 
-    if (text.contains('войн') ||
-        text.contains('нем')) {
-      return 'war';
-    }
-
-    if (text.contains('работ')) {
-      return 'work';
-    }
-
-    return 'general';
-  }
-
-  String _buildNarrativeSentence(
-    EventModel event,
-    String topic,
-  ) {
-    switch (topic) {
-      case 'transport':
-        return 'Во время войны важную роль играла железнодорожная станция, через которую постоянно проходили эшелоны и военная техника.';
-
-      case 'family':
-        return 'Семья жила в тяжёлых военных условиях, а родители большую часть времени проводили на работе.';
-
-      case 'war':
-        return 'Особенно запомнились события военного времени, связанные с пленными немцами и жизнью рядом со станцией.';
-
-      case 'work':
-        return 'Жизнь людей была тесно связана с постоянной тяжёлой работой во время войны.';
-
-      default:
-        return _rewriteSentence(
-          event.originalSentence,
-        );
-    }
+    return sentence;
   }
 
   String _rewriteSentence(String sentence) {
     var result = sentence;
 
-    result = result.replaceAll(
-      RegExp(r'\bя\b', caseSensitive: false),
-      'он',
-    );
+    final replacements = {
+      r'\bя\b': 'рассказчик',
+      r'\bЯ\b': 'Рассказчик',
 
-    result = result.replaceAll(
-      RegExp(r'\bмы\b', caseSensitive: false),
-      'они',
-    );
+      r'\bмы\b': 'они',
+      r'\bМы\b': 'Они',
 
-    result = result.replaceAll(
-      RegExp(r'\bмой\b', caseSensitive: false),
-      'его',
-    );
+      r'\bмне\b': 'рассказчику',
+      r'\bМне\b': 'Рассказчику',
 
-    result = result.replaceAll(
-      RegExp(r'\bмоя\b', caseSensitive: false),
-      'его',
-    );
+      r'\bменя\b': 'рассказчика',
+      r'\bМеня\b': 'Рассказчика',
+
+      r'\bмой\b': 'его',
+      r'\bМой\b': 'Его',
+
+      r'\bмоя\b': 'его',
+      r'\bМоя\b': 'Его',
+
+      r'\bмоё\b': 'его',
+      r'\bМоё\b': 'Его',
+
+      r'\bмои\b': 'его',
+      r'\bМои\b': 'Его',
+    };
+
+    replacements.forEach((pattern, replacement) {
+      result = result.replaceAll(
+        RegExp(pattern),
+        replacement,
+      );
+    });
+
+    // Удаляем разговорные конструкции
+    const garbage = [
+      'конечно',
+      'наверное',
+      'честно говоря',
+      'как мне кажется',
+      'я уже не помню',
+    ];
+
+    for (final word in garbage) {
+      result = result.replaceAll(
+        RegExp(word, caseSensitive: false),
+        '',
+      );
+    }
 
     return result
         .replaceAll(RegExp(r'\s+'), ' ')
