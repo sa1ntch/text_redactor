@@ -2,35 +2,48 @@ import 'models/event_model.dart';
 
 class SummaryBuilder {
   String buildSummary(List<EventModel> events) {
-    if (events.isEmpty) {
-      return 'Не удалось сформировать краткое содержание.';
+  if (events.isEmpty) {
+    return 'Не удалось сформировать краткое содержание.';
+  }
+
+  final buffer = StringBuffer();
+
+  final usedTopics = <String>{};
+
+  int added = 0;
+
+  for (final event in events) {
+    if (added >= 4) {
+      break;
     }
 
-    final buffer = StringBuffer();
+    final topic = _detectTopic(event);
 
-    final usedTopics = <String>{};
+    String sentence = '';
 
-    for (final event in events.take(3)) {
-      final topic = _detectTopic(event);
-
-      if (usedTopics.contains(topic)) {
-        continue;
-      }
-
-      usedTopics.add(topic);
-
-      final sentence = _buildNarrativeSentence(
+    // Первые 2 темы — semantic rewrite
+    if (!usedTopics.contains(topic)) {
+      sentence = _buildNarrativeSentence(
         event,
         topic,
       );
 
-      if (sentence.isNotEmpty) {
-        buffer.write('$sentence ');
-      }
+      usedTopics.add(topic);
+    } else {
+      // Остальные — rewrite original sentence
+      sentence = _rewriteSentence(
+        event.originalSentence,
+      );
     }
 
-    return _cleanup(buffer.toString());
+    if (sentence.isNotEmpty) {
+      buffer.write('$sentence ');
+      added++;
+    }
   }
+
+  return _cleanup(buffer.toString());
+}
 
   String _detectTopic(EventModel event) {
     final text =
