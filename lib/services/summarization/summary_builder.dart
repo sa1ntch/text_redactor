@@ -137,8 +137,10 @@ class SummaryBuilder {
   String _cleanup(String text) {
     return text
     .replaceAll(RegExp(r'\s+'), ' ')
+    .replaceAll(RegExp(r',\s*,'), ',')
     .replaceAll(RegExp(r'\s+\.'), '.')
     .replaceAll(RegExp(r'\s+,'), ',')
+    .replaceAll(RegExp(r'\.{2,}'), '.')
     .trim();
   }
 }
