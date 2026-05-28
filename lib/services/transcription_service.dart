@@ -170,82 +170,65 @@ class TranscriptionService {
     _client.close();
   }
 
-  static String parseTranscription(
-    String body,
-  ) {
-    final decoded =
-        jsonDecode(body)
-            as Map<String, dynamic>;
+  static String parseTranscription(String body) {
+    final decoded = jsonDecode(body) as Map<String, dynamic>;
+    final results = decoded['results'] as Map<String, dynamic>?;
+    final channels = results?['channels'] as List<dynamic>?;
 
-    final results =
-        decoded['results']
-            as Map<String, dynamic>?;
-
-    final channels =
-        results?['channels']
-            as List<dynamic>?;
-
-    if (channels == null ||
-        channels.isEmpty) {
+    if (channels == null || channels.isEmpty) {
       return '';
     }
 
-    final channel =
-        channels.first
-            as Map<String, dynamic>;
+    final channel = channels.first as Map<String, dynamic>;
+    final alternatives = channel['alternatives'] as List<dynamic>?;
 
-    final alternatives =
-        channel['alternatives']
-            as List<dynamic>?;
-
-    if (alternatives == null ||
-        alternatives.isEmpty) {
+    if (alternatives == null || alternatives.isEmpty) {
       return '';
     }
 
-    final alternative =
-        alternatives.first
-            as Map<String, dynamic>;
+    final alternative = alternatives.first as Map<String, dynamic>;
+    
+    final words = alternative['words'] as List<dynamic>?;
 
-    final paragraphsData =
-        alternative['paragraphs']
-            as Map<String, dynamic>?;
-
-    final paragraphs =
-        paragraphsData?['paragraphs']
-            as List<dynamic>?;
-
-    if (paragraphs == null ||
-        paragraphs.isEmpty) {
-      return alternative['transcript']
-              as String? ??
-          '';
+    if (words == null || words.isEmpty) {
+      return alternative['transcript'] as String? ?? '';
     }
 
     final buffer = StringBuffer();
+    int currentSpeaker = -1;
+    num currentBlockStart = 0;
+    final blockText = StringBuffer();
 
-    for (final paragraphItem in paragraphs) {
-      final paragraph = paragraphItem as Map<String, dynamic>;
+    for (var i = 0; i < words.length; i++) {
+      final wordData = words[i] as Map<String, dynamic>;
       
-      final text = paragraph['sentences'] != null
-          ? (paragraph['sentences'] as List<dynamic>)
-              .map((s) => (s as Map<String, dynamic>)['text'] as String? ?? '')
-              .join(' ')
-          : '';
-          
-      if (text.trim().isEmpty) {
-        continue;
+      final speakerIndex = wordData['speaker'] as int? ?? 0;
+      
+      final wordText = wordData['punctuated_word'] as String? ?? wordData['word'] as String? ?? '';
+
+      if (speakerIndex != currentSpeaker) {
+        
+        if (currentSpeaker != -1) {
+          final minutes = (currentBlockStart ~/ 60).toString().padLeft(2, '0');
+          final seconds = (currentBlockStart % 60).floor().toString().padLeft(2, '0');
+          buffer.writeln('[$minutes:$seconds] Спикер $currentSpeaker:');
+          buffer.writeln(blockText.toString().trim());
+          buffer.writeln();
+        }
+        
+        currentSpeaker = speakerIndex;
+        currentBlockStart = wordData['start'] as num? ?? 0;
+        blockText.clear();
       }
-      
-      final start = paragraph['start'] as num? ?? 0;
-      final minutes = (start ~/ 60).toString().padLeft(2, '0');
-      final seconds = (start % 60).floor().toString().padLeft(2, '0');
-      
-      final speakerIndex = paragraph['speaker'] as int? ?? 0;
 
-      buffer.writeln('[$minutes:$seconds] Спикер $speakerIndex:');
-      buffer.writeln(text.trim());
-      buffer.writeln();
+      blockText.write('$wordText ');
+    }
+
+    if (blockText.isNotEmpty) {
+      final minutes = (currentBlockStart ~/ 60).toString().padLeft(2, '0');
+      final seconds = (currentBlockStart % 60).floor().toString().padLeft(2, '0');
+      buffer.writeln('[$minutes:$seconds] Спикер $currentSpeaker:');
+      buffer.writeln(blockText.toString().trim());
     }
 
     return buffer.toString().trim();
