@@ -81,12 +81,13 @@ class SummaryBuilder {
 
   String _compressEvent(EventModel event, bool isFemale) {
     var sentence = event.originalSentence;
-
     sentence = sentence.replaceAll(RegExp(r'\[\d{2,}:?\d{2}:\d{2}\]'), '');
     sentence = sentence.replaceAll(RegExp(r'\[\d{2}:\d{2}\]'), '');
 
-    sentence = _rewriteSentence(sentence, isFemale);
+    sentence = sentence.replaceAll(RegExp(r'\[?Спикер\s*\d+\]?:?', caseSensitive: false), '');
 
+    sentence = _rewriteSentence(sentence, isFemale);
+  
     for (final word in _garbagePhrases) {
       final pattern = RegExp(
         r'(?<![а-яА-ЯёЁ])' + RegExp.escape(word) + r'(?![а-яА-ЯёЁ])',
