@@ -181,49 +181,38 @@ class TranscriptionService {
     if (words == null || words.isEmpty) return alternative?['transcript'] as String? ?? '';
 
     final buffer = StringBuffer();
-    
-    int currentSpeaker = -1;
-    num lastEndTime = 0;
     final blockText = StringBuffer();
-    num blockStartTime = 0;
-    bool isFirstBlock = true;
+    
+    int wordCounter = 0;
+    num blockStartTime = words.first['start'] as num? ?? 0;
 
     for (var i = 0; i < words.length; i++) {
       final wordData = words[i] as Map<String, dynamic>;
-      final speakerIndex = wordData['speaker'] as int? ?? 0;
-      final startTime = wordData['start'] as num? ?? 0;
-      final endTime = wordData['end'] as num? ?? 0;
       final wordText = wordData['punctuated_word'] as String? ?? wordData['word'] as String? ?? '';
-
-      final isLongPause = (i > 0 && (startTime - lastEndTime) > 2.0);
-      final isNewSpeaker = (currentSpeaker != -1 && speakerIndex != currentSpeaker);
-
-      if (isLongPause || (isNewSpeaker && !isFirstBlock)) {
-        if (blockText.isNotEmpty) {
-          final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
-          final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
-          
-          buffer.writeln('[$m:$s] Спикер $currentSpeaker:');
-          buffer.writeln(blockText.toString().trim());
-          buffer.writeln();
-          
-          isFirstBlock = false;
-        }
-        blockText.clear();
-        blockStartTime = startTime;
-      }
-
-      if (blockText.isEmpty) blockStartTime = startTime;
       
       blockText.write('$wordText ');
-      currentSpeaker = speakerIndex;
-      lastEndTime = endTime;
+      wordCounter++;
+
+      if (wordCounter >= 30) {
+        final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
+        final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
+        
+        buffer.writeln('[$m:$s] Спикер:');
+        buffer.writeln(blockText.toString().trim());
+        buffer.writeln();
+        
+        blockText.clear();
+        wordCounter = 0;
+        if (i + 1 < words.length) {
+          blockStartTime = words[i + 1]['start'] as num? ?? 0;
+        }
+      }
     }
 
     if (blockText.isNotEmpty) {
       final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
       final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
-      buffer.writeln('[$m:$s] Спикер $currentSpeaker:');
+      buffer.writeln('[$m:$s] Спикер:');
       buffer.writeln(blockText.toString().trim());
     }
 
