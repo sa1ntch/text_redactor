@@ -48,6 +48,7 @@ class TranscriptionService {
       'punctuate': 'true',
       'diarize': 'true',
       'paragraphs': 'true',
+      'multichannel': 'true',
     },
   );
 
@@ -85,6 +86,7 @@ class TranscriptionService {
         'punctuate': 'true',
         'diarize': 'true',
         'paragraphs': 'true',
+        'multichannel': 'true',
       },
     );
 
