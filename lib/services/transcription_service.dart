@@ -149,51 +149,35 @@ class TranscriptionService {
     final decoded = jsonDecode(body) as Map<String, dynamic>;
     final results = decoded['results'] as Map<String, dynamic>?;
     final channels = results?['channels'] as List<dynamic>?;
-
     if (channels == null || channels.isEmpty) return '';
 
-    final channel = channels.first as Map<String, dynamic>;
-    final alternatives = channel['alternatives'] as List<dynamic>?;
-
-    if (alternatives == null || alternatives.isEmpty) return '';
-
-    final alternative = alternatives.first as Map<String, dynamic>;
-    final paragraphsData = alternative['paragraphs'] as Map<String, dynamic>?;
-    final paragraphs = paragraphsData?['paragraphs'] as List<dynamic>?;
-
-    if (paragraphs == null || paragraphs.isEmpty) {
-      return alternative['transcript'] as String? ?? '';
-    }
+    final alternative = (channels.first['alternatives'] as List<dynamic>?)?.first as Map<String, dynamic>?;
+    final words = alternative?['words'] as List<dynamic>?;
+    if (words == null || words.isEmpty) return alternative?['transcript'] as String? ?? '';
 
     final buffer = StringBuffer();
-    // Храним данные о последнем спикере
-    int lastSpeakerIndex = -1;
-    bool isFirstParagraph = true;
+    int lastSpeaker = -1;
+    num lastTime = -1;
+    bool isFirst = true;
 
-    for (final paragraphItem in paragraphs) {
-      final paragraph = paragraphItem as Map<String, dynamic>;
-      final text = (paragraph['sentences'] as List<dynamic>?)
-              ?.map((s) => (s as Map<String, dynamic>)['text'] as String? ?? '')
-              .join(' ') ?? '';
+    for (final wordData in words) {
+      final speaker = wordData['speaker'] as int? ?? 0;
+      final start = wordData['start'] as num? ?? 0;
+      final text = wordData['punctuated_word'] as String? ?? wordData['word'] as String? ?? '';
 
-      if (text.trim().isEmpty) continue;
-
-      final speakerIndex = paragraph['speaker'] as int? ?? 0;
-      final start = paragraph['start'] as num? ?? 0;
-      final minutes = (start ~/ 60).toString().padLeft(2, '0');
-      final seconds = (start % 60).floor().toString().padLeft(2, '0');
-
-      if (speakerIndex == lastSpeakerIndex && !isFirstParagraph) {
-        // Если это тот же спикер, дописываем текст в тот же блок
-        buffer.write(' ${text.trim()}');
-      } else {
-        // Новый спикер или самое начало: создаем заголовок
-        if (!isFirstParagraph) buffer.writeln('\n');
-        buffer.writeln('[$minutes:$seconds] Спикер $speakerIndex:');
-        buffer.write(text.trim());
-        lastSpeakerIndex = speakerIndex;
-        isFirstParagraph = false;
+      if (speaker != lastSpeaker || (start - lastTime > 3.0) || isFirst) {
+        if (!isFirst) buffer.writeln('\n');
+        
+        final m = (start ~/ 60).toString().padLeft(2, '0');
+        final s = (start % 60).floor().toString().padLeft(2, '0');
+        
+        buffer.writeln('[$m:$s] Спикер $speaker:');
+        isFirst = false;
       }
+
+      buffer.write('$text ');
+      lastSpeaker = speaker;
+      lastTime = wordData['end'] as num? ?? start;
     }
 
     return buffer.toString().trim();
