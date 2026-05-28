@@ -174,60 +174,53 @@ class TranscriptionService {
     final decoded = jsonDecode(body) as Map<String, dynamic>;
     final results = decoded['results'] as Map<String, dynamic>?;
     final channels = results?['channels'] as List<dynamic>?;
+    if (channels == null || channels.isEmpty) return '';
 
-    if (channels == null || channels.isEmpty) {
-      return '';
-    }
-
-    final channel = channels.first as Map<String, dynamic>;
-    final alternatives = channel['alternatives'] as List<dynamic>?;
-
-    if (alternatives == null || alternatives.isEmpty) {
-      return '';
-    }
-
-    final alternative = alternatives.first as Map<String, dynamic>;
-    
-    final words = alternative['words'] as List<dynamic>?;
-
-    if (words == null || words.isEmpty) {
-      return alternative['transcript'] as String? ?? '';
-    }
+    final alternative = (channels.first['alternatives'] as List<dynamic>?)?.first as Map<String, dynamic>?;
+    final words = alternative?['words'] as List<dynamic>?;
+    if (words == null || words.isEmpty) return alternative?['transcript'] as String? ?? '';
 
     final buffer = StringBuffer();
-    int currentSpeaker = -1;
-    num currentBlockStart = 0;
+
+    int lastAssignedSpeaker = -1;
+    num lastEndTime = 0;
     final blockText = StringBuffer();
+    num blockStartTime = 0;
 
     for (var i = 0; i < words.length; i++) {
       final wordData = words[i] as Map<String, dynamic>;
-      
-      final speakerIndex = wordData['speaker'] as int? ?? 0;
-      
+      final startTime = wordData['start'] as num? ?? 0;
+      final endTime = wordData['end'] as num? ?? 0;
       final wordText = wordData['punctuated_word'] as String? ?? wordData['word'] as String? ?? '';
 
-      if (speakerIndex != currentSpeaker) {
+      final isLongPause = (i > 0 && (startTime - lastEndTime) > 2.0);
+
+      if (isLongPause) {
+        final nextSpeaker = (lastAssignedSpeaker == 0) ? 1 : 0;
         
-        if (currentSpeaker != -1) {
-          final minutes = (currentBlockStart ~/ 60).toString().padLeft(2, '0');
-          final seconds = (currentBlockStart % 60).floor().toString().padLeft(2, '0');
-          buffer.writeln('[$minutes:$seconds] Спикер $currentSpeaker:');
+        if (blockText.isNotEmpty) {
+          final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
+          final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
+          buffer.writeln('[$m:$s] Спикер $nextSpeaker:');
           buffer.writeln(blockText.toString().trim());
           buffer.writeln();
+          
+          lastAssignedSpeaker = nextSpeaker;
         }
         
-        currentSpeaker = speakerIndex;
-        currentBlockStart = wordData['start'] as num? ?? 0;
         blockText.clear();
+        blockStartTime = startTime;
       }
 
       blockText.write('$wordText ');
+      lastEndTime = endTime;
     }
 
     if (blockText.isNotEmpty) {
-      final minutes = (currentBlockStart ~/ 60).toString().padLeft(2, '0');
-      final seconds = (currentBlockStart % 60).floor().toString().padLeft(2, '0');
-      buffer.writeln('[$minutes:$seconds] Спикер $currentSpeaker:');
+      final nextSpeaker = (lastAssignedSpeaker == 0) ? 1 : 0;
+      final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
+      final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
+      buffer.writeln('[$m:$s] Спикер $nextSpeaker:');
       buffer.writeln(blockText.toString().trim());
     }
 
