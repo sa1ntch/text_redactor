@@ -169,32 +169,37 @@ class TranscriptionService {
       return alternative['transcript'] as String? ?? '';
     }
 
-    // Дубликат удален, оставляем строго один StringBuffer
     final buffer = StringBuffer();
-
+    String lastSpeaker = '';
+    
     for (final paragraphItem in paragraphs) {
       final paragraph = paragraphItem as Map<String, dynamic>;
+      final text = (paragraph['sentences'] as List<dynamic>?)
+              ?.map((s) => (s as Map<String, dynamic>)['text'] as String? ?? '')
+              .join(' ') ?? '';
 
-      final text = paragraph['sentences'] != null
-          ? (paragraph['sentences'] as List<dynamic>)
-              .map((s) => (s as Map<String, dynamic>)['text'] as String? ?? '')
-              .join(' ')
-          : '';
-
-      if (text.trim().isEmpty) {
-        continue;
-      }
+      if (text.trim().isEmpty) continue;
 
       final start = paragraph['start'] as num? ?? 0;
-      final minutes = (start ~/ 60).toString().padLeft(2, '0');
-      final seconds = (start % 60).floor().toString().padLeft(2, '0');
-
-      // Извлекаем спикера из структуры параграфа
       final speakerIndex = paragraph['speaker'] as int? ?? 0;
+      final speakerLabel = 'Спикер $speakerIndex';
 
-      buffer.writeln('[$minutes:$seconds] Спикер $speakerIndex:');
-      buffer.writeln(text.trim());
-      buffer.writeln(); 
+      if (lastSpeaker == speakerLabel) {
+        final currentContent = buffer.toString().trimRight();
+        final lastNewline = currentContent.lastIndexOf('\n');
+        final cleanBuffer = currentContent.substring(0, lastNewline);
+        
+        buffer.clear();
+        buffer.write(cleanBuffer);
+        buffer.writeln(' ${text.trim()}');
+      } else {
+        final minutes = (start ~/ 60).toString().padLeft(2, '0');
+        final seconds = (start % 60).floor().toString().padLeft(2, '0');
+        buffer.writeln('[$minutes:$seconds] $speakerLabel:');
+        buffer.writeln(text.trim());
+        buffer.writeln();
+        lastSpeaker = speakerLabel;
+      }
     }
 
     return buffer.toString().trim();
