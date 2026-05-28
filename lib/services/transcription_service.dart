@@ -150,16 +150,12 @@ class TranscriptionService {
     final results = decoded['results'] as Map<String, dynamic>?;
     final channels = results?['channels'] as List<dynamic>?;
 
-    if (channels == null || channels.isEmpty) {
-      return '';
-    }
+    if (channels == null || channels.isEmpty) return '';
 
     final channel = channels.first as Map<String, dynamic>;
     final alternatives = channel['alternatives'] as List<dynamic>?;
 
-    if (alternatives == null || alternatives.isEmpty) {
-      return '';
-    }
+    if (alternatives == null || alternatives.isEmpty) return '';
 
     final alternative = alternatives.first as Map<String, dynamic>;
     final paragraphsData = alternative['paragraphs'] as Map<String, dynamic>?;
@@ -170,8 +166,10 @@ class TranscriptionService {
     }
 
     final buffer = StringBuffer();
-    String lastSpeaker = '';
-    
+    // Храним данные о последнем спикере
+    int lastSpeakerIndex = -1;
+    bool isFirstParagraph = true;
+
     for (final paragraphItem in paragraphs) {
       final paragraph = paragraphItem as Map<String, dynamic>;
       final text = (paragraph['sentences'] as List<dynamic>?)
@@ -180,25 +178,21 @@ class TranscriptionService {
 
       if (text.trim().isEmpty) continue;
 
-      final start = paragraph['start'] as num? ?? 0;
       final speakerIndex = paragraph['speaker'] as int? ?? 0;
-      final speakerLabel = 'Спикер $speakerIndex';
+      final start = paragraph['start'] as num? ?? 0;
+      final minutes = (start ~/ 60).toString().padLeft(2, '0');
+      final seconds = (start % 60).floor().toString().padLeft(2, '0');
 
-      if (lastSpeaker == speakerLabel) {
-        final currentContent = buffer.toString().trimRight();
-        final lastNewline = currentContent.lastIndexOf('\n');
-        final cleanBuffer = currentContent.substring(0, lastNewline);
-        
-        buffer.clear();
-        buffer.write(cleanBuffer);
-        buffer.writeln(' ${text.trim()}');
+      if (speakerIndex == lastSpeakerIndex && !isFirstParagraph) {
+        // Если это тот же спикер, дописываем текст в тот же блок
+        buffer.write(' ${text.trim()}');
       } else {
-        final minutes = (start ~/ 60).toString().padLeft(2, '0');
-        final seconds = (start % 60).floor().toString().padLeft(2, '0');
-        buffer.writeln('[$minutes:$seconds] $speakerLabel:');
-        buffer.writeln(text.trim());
-        buffer.writeln();
-        lastSpeaker = speakerLabel;
+        // Новый спикер или самое начало: создаем заголовок
+        if (!isFirstParagraph) buffer.writeln('\n');
+        buffer.writeln('[$minutes:$seconds] Спикер $speakerIndex:');
+        buffer.write(text.trim());
+        lastSpeakerIndex = speakerIndex;
+        isFirstParagraph = false;
       }
     }
 
