@@ -158,33 +158,51 @@ class TranscriptionService {
     num blockStartTime = 0;
     final blockText = StringBuffer();
 
+    final buffer = StringBuffer();
+    int activeSpeaker = -1;
+    num blockStartTime = 0;
+    num blockEndTime = 0; // Добавляем отслеживание конца
+    final blockText = StringBuffer();
+
     for (var i = 0; i < words.length; i++) {
       final wordData = words[i] as Map<String, dynamic>;
       final speaker = wordData['speaker'] as int? ?? 0;
       final start = wordData['start'] as num? ?? 0;
+      final end = wordData['end'] as num? ?? 0; // Получаем конец слова
       final text = wordData['punctuated_word'] as String? ?? wordData['word'] as String? ?? '';
 
-
+      // Если спикер сменился
       if (activeSpeaker != -1 && speaker != activeSpeaker) {
-        if ((start - blockStartTime) < 1.5) {
+        final duration = blockEndTime - blockStartTime;
+
+        // ЛОГИКА СКЛЕЙКИ:
+        // Если реплика длилась меньше 2 секунд, считаем ее шумом/ошибкой
+        if (duration < 2.0) {
+          // Просто продолжаем писать в тот же blockText, не закрывая блок
+          // (ничего не делаем, просто игнорируем смену спикера)
         } else {
+          // Реальная смена спикера: записываем старый блок
           final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
           final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
+          
           buffer.writeln('[$m:$s] Спикер $activeSpeaker:');
           buffer.writeln(blockText.toString().trim());
           buffer.writeln();
 
+          // Очищаем для нового спикера
           blockText.clear();
           blockStartTime = start;
-          activeSpeaker = speaker;
         }
       }
 
       if (activeSpeaker == -1) activeSpeaker = speaker;
       
       blockText.write('$text ');
+      activeSpeaker = speaker;
+      blockEndTime = end; // Обновляем конец блока
     }
-    
+
+    // Записываем остаток (последний накопленный блок)
     if (blockText.isNotEmpty) {
       final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
       final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
