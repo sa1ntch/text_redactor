@@ -48,7 +48,6 @@ class TranscriptionService {
       'punctuate': 'true',
       'diarize': 'true',
       'paragraphs': 'true',
-      'multichannel': 'true',
     },
   );
 
@@ -86,7 +85,6 @@ class TranscriptionService {
         'punctuate': 'true',
         'diarize': 'true',
         'paragraphs': 'true',
-        'multichannel': 'true',
       },
     );
 
@@ -227,30 +225,28 @@ class TranscriptionService {
     final buffer = StringBuffer();
 
     for (final paragraphItem in paragraphs) {
-  final paragraph = paragraphItem as Map<String, dynamic>;
-  final text = paragraph['sentences'] != null
-      ? (paragraph['sentences'] as List<dynamic>)
-          .map((s) => (s as Map<String, dynamic>)['text'] as String? ?? '')
-          .join(' ')
-      : '';
+      final paragraph = paragraphItem as Map<String, dynamic>;
       
-  if (text.trim().isEmpty) {
-    continue;
-  }
-  
-  final start = paragraph['start'] as num? ?? 0;
-  final minutes = (start ~/ 60).toString().padLeft(2, '0');
-  final seconds = (start % 60).floor().toString().padLeft(2, '0');
-  
-  // Достаём номер спикера из JSON (если его вдруг нет, ставим 0)
-  final speakerIndex = paragraph['speaker'] as int? ?? 0;
+      final text = paragraph['sentences'] != null
+          ? (paragraph['sentences'] as List<dynamic>)
+              .map((s) => (s as Map<String, dynamic>)['text'] as String? ?? '')
+              .join(' ')
+          : '';
+          
+      if (text.trim().isEmpty) {
+        continue;
+      }
+      
+      final start = paragraph['start'] as num? ?? 0;
+      final minutes = (start ~/ 60).toString().padLeft(2, '0');
+      final seconds = (start % 60).floor().toString().padLeft(2, '0');
+      
+      final speakerIndex = paragraph['speaker'] as int? ?? 0;
 
-  buffer.writeln('[$minutes:$seconds]');
-  buffer.writeln('[Спикер $speakerIndex]'); // <-- Теперь выводим номер динамически
-  buffer.writeln();
-  buffer.writeln(text.trim());
-  buffer.writeln();
-}
+      buffer.writeln('[$minutes:$seconds] Спикер $speakerIndex:');
+      buffer.writeln(text.trim());
+      buffer.writeln();
+    }
 
     return buffer.toString().trim();
   }
