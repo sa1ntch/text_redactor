@@ -1,8 +1,6 @@
 import 'models/event_model.dart';
 
 class SummaryBuilder {
-  // Выносим расширенный список мусорных конструкций (дискурсивных маркеров устной речи)
-  // в единую статическую константу во избежание дублирования в коде
   static const List<String> _garbagePhrases = [
     'конечно',
     'наверное',
@@ -45,8 +43,6 @@ class SummaryBuilder {
     'как-то так',
   ];
 
-  /// Точка входа для сборки краткого содержания.
-  /// [isFemale] - флаг, определяющий пол спикера (true - женский, false - мужской)
   String buildSummary(List<EventModel> events, {bool isFemale = false}) {
     if (events.isEmpty) {
       return 'Не удалось сформировать краткое содержание.';
@@ -68,7 +64,6 @@ class SummaryBuilder {
 
       usedConcepts.add(concept);
 
-      // Передаем пол рассказчика в метод сжатия и рерайтинга
       final rewritten = _compressEvent(event, isFemale);
 
       if (rewritten.isNotEmpty) {
@@ -87,12 +82,12 @@ class SummaryBuilder {
   String _compressEvent(EventModel event, bool isFemale) {
     var sentence = event.originalSentence;
 
-    // 1. Смена местоимений и лиц с учетом гендера
+    sentence = sentence.replaceAll(RegExp(r'\[\d{2,}:?\d{2}:\d{2}\]'), '');
+    sentence = sentence.replaceAll(RegExp(r'\[\d{2}:\d{2}\]'), '');
+
     sentence = _rewriteSentence(sentence, isFemale);
 
-    // 2. Фильтрация семантического шума (мусорных фраз)
     for (final word in _garbagePhrases) {
-      // Используем границы слов, адаптированные под кириллицу
       final pattern = RegExp(
         r'(?<![а-яА-ЯёЁ])' + RegExp.escape(word) + r'(?![а-яА-ЯёЁ])',
         caseSensitive: false,
@@ -100,12 +95,18 @@ class SummaryBuilder {
       sentence = sentence.replaceAll(pattern, '');
     }
 
-    // 3. Финальное форматирование строки
     sentence = sentence.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    final leadingTakPattern = RegExp(
+      r'^так(?:,\s*|\s+)(?!(?:как|что)(?![а-яА-ЯёЁ]))',
+      caseSensitive: false,
+    );
+    sentence = sentence.replaceFirst(leadingTakPattern, '');
+
+    sentence = sentence.trim();
 
     if (sentence.isEmpty) return '';
 
-    // Удаляем висящие запятые, которые могли остаться после вырезания вводных слов
     if (sentence.startsWith(',')) {
       sentence = sentence.substring(1).trim();
     }
@@ -124,23 +125,15 @@ class SummaryBuilder {
   String _rewriteSentence(String sentence, bool isFemale) {
     var result = sentence;
 
-    // Динамически формируем правила замены в зависимости от пола рассказчика
     final Map<String, String> replacements = {
-      // Замена для местоимения "Я"
       r'я': isFemale ? 'рассказчица' : 'рассказчик',
       r'Я': isFemale ? 'Рассказчица' : 'Рассказчик',
-      
-      // Замена для падежных форм "Мне / Меня"
       r'мне': isFemale ? 'рассказчице' : 'рассказчику',
       r'Мне': isFemale ? 'Рассказчице' : 'Рассказчику',
-      r'меня': isFemale ? 'рассказчика' : 'рассказчика', // в род./вин. падеже совпадает
-      r'Меня': isFemale ? 'Рассказчика' : 'Рассказчика',
-
-      // Мы -> Они
+      r'меня': 'рассказчика',
+      r'Меня': 'Рассказчика',
       r'мы': 'они',
       r'Мы': 'Они',
-
-      // Притяжательные местоимения (мой/моя/моё/мои) -> его/её
       r'мой': isFemale ? 'её' : 'его',
       r'Мой': isFemale ? 'Её' : 'Его',
       r'моя': isFemale ? 'её' : 'его',
@@ -151,7 +144,6 @@ class SummaryBuilder {
       r'Мои': isFemale ? 'Её' : 'Его',
     };
 
-    // Применяем замены с использованием безопасных кириллических границ слова
     replacements.forEach((word, replacement) {
       final pattern = RegExp(r'(?<![а-яА-ЯёЁ])' + word + r'(?![а-яА-ЯёЁ])');
       result = result.replaceAll(pattern, replacement);
@@ -163,11 +155,11 @@ class SummaryBuilder {
   String _cleanup(String text) {
     return text
         .replaceAll(RegExp(r'\s+'), ' ')
-        .replaceAll(RegExp(r'\s*,\s*,'), ',') // Двойные запятые
-        .replaceAll(RegExp(r'\s+\.'), '.')     // Пробел перед точкой
-        .replaceAll(RegExp(r'\s+,'), ',')      // Пробел перед запятой
-        .replaceAll(RegExp(r'\s*,\s*\.'), '.') // Запятая перед точкой
-        .replaceAll(RegExp(r'\.{2,}'), '.')    // Двоеточия/многоточия в одну точку
+        .replaceAll(RegExp(r'\s*,\s*,'), ',')
+        .replaceAll(RegExp(r'\s+\.'), '.')
+        .replaceAll(RegExp(r'\s+,'), ',')
+        .replaceAll(RegExp(r'\s*,\s*\.'), '.')
+        .replaceAll(RegExp(r'\.{2,}'), '.')
         .trim();
   }
 }
