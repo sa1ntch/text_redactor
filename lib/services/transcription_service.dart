@@ -151,13 +151,10 @@ class TranscriptionService {
 
     final alternative = (channels.first['alternatives'] as List<dynamic>?)?.first as Map<String, dynamic>?;
     final words = alternative?['words'] as List<dynamic>?;
-
-    if (words == null || words.isEmpty) {
-      return alternative?['transcript'] as String? ?? '';
-    }
+    if (words == null || words.isEmpty) return alternative?['transcript'] as String? ?? '';
 
     final buffer = StringBuffer();
-    int lastSpeaker = -1;
+    int activeSpeaker = -1;
     num blockStartTime = 0;
     final blockText = StringBuffer();
 
@@ -167,30 +164,31 @@ class TranscriptionService {
       final start = wordData['start'] as num? ?? 0;
       final text = wordData['punctuated_word'] as String? ?? wordData['word'] as String? ?? '';
 
-      // Логика склейки: новый блок создается, если спикер сменился 
-      // И с момента начала блока прошло более 0.5 секунд (отсекаем глитчи)
-      if (lastSpeaker != -1 && speaker != lastSpeaker && (start - blockStartTime) > 0.5) {
-        final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
-        final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
-        
-        buffer.writeln('[$m:$s] Спикер $lastSpeaker:');
-        buffer.writeln(blockText.toString().trim());
-        buffer.writeln();
 
-        blockText.clear();
-        blockStartTime = start;
+      if (activeSpeaker != -1 && speaker != activeSpeaker) {
+        if ((start - blockStartTime) < 1.5) {
+        } else {
+          final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
+          final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
+          buffer.writeln('[$m:$s] Спикер $activeSpeaker:');
+          buffer.writeln(blockText.toString().trim());
+          buffer.writeln();
+
+          blockText.clear();
+          blockStartTime = start;
+          activeSpeaker = speaker;
+        }
       }
 
-      if (blockText.isEmpty) blockStartTime = start;
+      if (activeSpeaker == -1) activeSpeaker = speaker;
+      
       blockText.write('$text ');
-      lastSpeaker = speaker;
     }
-
-    // Записываем остаток (последний накопленный блок)
+    
     if (blockText.isNotEmpty) {
       final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
       final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
-      buffer.writeln('[$m:$s] Спикер $lastSpeaker:');
+      buffer.writeln('[$m:$s] Спикер $activeSpeaker:');
       buffer.writeln(blockText.toString().trim());
     }
 
