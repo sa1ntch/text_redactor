@@ -21,8 +21,8 @@ class TranscriptionService {
   TranscriptionService({
     http.Client? client,
     Duration? requestTimeout,
-  }) : _client = client ?? http.Client(),
-       _requestTimeout = requestTimeout ?? const Duration(minutes: 15);
+  })  : _client = client ?? http.Client(),
+        _requestTimeout = requestTimeout ?? const Duration(minutes: 15);
 
   static const attributionText = 'Транскрибация: Deepgram Speech-to-Text';
   static const defaultModel = 'nova-3';
@@ -57,9 +57,7 @@ class TranscriptionService {
     final normalizedApiKey = normalizeApiKey(apiKey);
 
     if (normalizedApiKey.isEmpty) {
-      throw const TranscriptionServiceException(
-        'Укажите Deepgram API key.',
-      );
+      throw const TranscriptionServiceException('Укажите Deepgram API key.');
     }
 
     if (file.size > freeTierMaxFileSizeBytes) {
@@ -145,7 +143,20 @@ class TranscriptionService {
     _client.close();
   }
 
-  final buffer = StringBuffer();
+  static String parseTranscription(String body) {
+    final decoded = jsonDecode(body) as Map<String, dynamic>;
+    final results = decoded['results'] as Map<String, dynamic>?;
+    final channels = results?['channels'] as List<dynamic>?;
+    if (channels == null || channels.isEmpty) return '';
+
+    final alternative = (channels.first['alternatives'] as List<dynamic>?)?.first as Map<String, dynamic>?;
+    final words = alternative?['words'] as List<dynamic>?;
+
+    if (words == null || words.isEmpty) {
+      return alternative?['transcript'] as String? ?? '';
+    }
+
+    final buffer = StringBuffer();
     int lastSpeaker = -1;
     num blockStartTime = 0;
     final blockText = StringBuffer();
@@ -156,9 +167,12 @@ class TranscriptionService {
       final start = wordData['start'] as num? ?? 0;
       final text = wordData['punctuated_word'] as String? ?? wordData['word'] as String? ?? '';
 
+      // Логика склейки: новый блок создается, если спикер сменился 
+      // И с момента начала блока прошло более 0.5 секунд (отсекаем глитчи)
       if (lastSpeaker != -1 && speaker != lastSpeaker && (start - blockStartTime) > 0.5) {
         final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
         final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
+        
         buffer.writeln('[$m:$s] Спикер $lastSpeaker:');
         buffer.writeln(blockText.toString().trim());
         buffer.writeln();
@@ -167,16 +181,21 @@ class TranscriptionService {
         blockStartTime = start;
       }
 
+      if (blockText.isEmpty) blockStartTime = start;
       blockText.write('$text ');
       lastSpeaker = speaker;
     }
 
+    // Записываем остаток (последний накопленный блок)
     if (blockText.isNotEmpty) {
       final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
       final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
       buffer.writeln('[$m:$s] Спикер $lastSpeaker:');
       buffer.writeln(blockText.toString().trim());
     }
+
+    return buffer.toString().trim();
+  }
 
   static String normalizeApiKey(String apiKey) {
     final withoutBearer = apiKey.trim().replaceFirst(
