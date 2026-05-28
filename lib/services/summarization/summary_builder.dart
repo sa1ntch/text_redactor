@@ -82,41 +82,46 @@ class SummaryBuilder {
   String _compressEvent(EventModel event, bool isFemale) {
     var sentence = event.originalSentence;
 
-    sentence = sentence.replaceAll(RegExp(r'\[\d{2,}:?\d{2}:\d{2}\]'), '');
-    sentence = sentence.replaceAll(RegExp(r'\[\d{2}:\d{2}\]'), '');
-    sentence = sentence.replaceAll(RegExp(r'\[?Спикер\s*\d+\]?:?', caseSensitive: false), '');
+    sentence = sentence.replaceAll(RegExp(r'\[.*?\]'), '');
+    sentence = sentence.replaceAll(RegExp(r'Спикер\s*\d+:?', caseSensitive: false), '');
 
     sentence = _rewriteSentence(sentence, isFemale);
 
-    final startTrashPattern = RegExp(
-      r'^(ну|и|а|так|окей|ладно|вот)\s*[,!.]?\s*',
-      caseSensitive: false,
-    );
-
-    while (startTrashPattern.hasMatch(sentence)) {
-      sentence = sentence.replaceFirst(startTrashPattern, '');
-    }
-    
     for (final word in _garbagePhrases) {
-      final pattern = RegExp(
-        r'(?<![а-яА-ЯёЁ])' + RegExp.escape(word) + r'(?![а-яА-ЯёЁ])',
-        caseSensitive: false,
-      );
+      final pattern = RegExp(r'(?<![а-яА-ЯёЁ])' + RegExp.escape(word) + r'(?![а-яА-ЯёЁ])', caseSensitive: false);
       sentence = sentence.replaceAll(pattern, '');
     }
 
+    final startWordWithComma = RegExp(
+      r'^[а-яёА-ЯЁ]+\s*,', 
+      caseSensitive: false
+    );
+
+    if (startWordWithComma.hasMatch(sentence)) {
+      sentence = sentence.replaceFirst(startWordWithComma, '');
+    }
+
+    final startTrashPattern = RegExp(
+      r'^(ну|и|а|так|окей|ладно|вот|короче|значит|собственно)\s*[,!.]?\s*',
+      caseSensitive: false,
+    );
+    
+    while (startTrashPattern.hasMatch(sentence)) {
+      sentence = sentence.replaceFirst(startTrashPattern, '');
+    }
+
     sentence = sentence.replaceAll(RegExp(r'\s+'), ' ').trim();
+    sentence = sentence.replaceAll(RegExp(r'^[,.!?;:]+\s*'), ''); // Убираем знаки в начале
 
     if (sentence.isEmpty) return '';
-
-    sentence = sentence.replaceAll(RegExp(r'^[,.!]\s*'), '');
-    
+    sentence = sentence[0].toUpperCase() + sentence.substring(1);
     if (!sentence.endsWith('.')) {
       sentence += '.';
     }
 
-    return sentence[0].toUpperCase() + sentence.substring(1);
+    return sentence;
   }
+  
   String _rewriteSentence(String sentence, bool isFemale) {
     var result = sentence;
 
