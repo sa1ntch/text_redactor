@@ -145,31 +145,18 @@ class TranscriptionService {
     _client.close();
   }
 
-  static String parseTranscription(String body) {
-    final decoded = jsonDecode(body) as Map<String, dynamic>;
-    final results = decoded['results'] as Map<String, dynamic>?;
-    final channels = results?['channels'] as List<dynamic>?;
-    if (channels == null || channels.isEmpty) return '';
-
-    final alternative = (channels.first['alternatives'] as List<dynamic>?)?.first as Map<String, dynamic>?;
-    final words = alternative?['words'] as List<dynamic>?;
-    if (words == null || words.isEmpty) return alternative?['transcript'] as String? ?? '';
-
-    final buffer = StringBuffer();
-    
+  final buffer = StringBuffer();
     int lastSpeaker = -1;
-    num lastEndTime = 0;
-    final blockText = StringBuffer();
     num blockStartTime = 0;
+    final blockText = StringBuffer();
 
     for (var i = 0; i < words.length; i++) {
       final wordData = words[i] as Map<String, dynamic>;
       final speaker = wordData['speaker'] as int? ?? 0;
       final start = wordData['start'] as num? ?? 0;
-      final end = wordData['end'] as num? ?? 0;
       final text = wordData['punctuated_word'] as String? ?? wordData['word'] as String? ?? '';
 
-      if (lastSpeaker != -1 && speaker != lastSpeaker && (start - lastEndTime) > 2.0) {
+      if (lastSpeaker != -1 && speaker != lastSpeaker && (start - blockStartTime) > 0.5) {
         final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
         final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
         buffer.writeln('[$m:$s] Спикер $lastSpeaker:');
@@ -180,10 +167,8 @@ class TranscriptionService {
         blockStartTime = start;
       }
 
-      if (blockText.isEmpty) blockStartTime = start;
       blockText.write('$text ');
       lastSpeaker = speaker;
-      lastEndTime = end;
     }
 
     if (blockText.isNotEmpty) {
@@ -192,9 +177,6 @@ class TranscriptionService {
       buffer.writeln('[$m:$s] Спикер $lastSpeaker:');
       buffer.writeln(blockText.toString().trim());
     }
-
-    return buffer.toString().trim();
-  }
 
   static String normalizeApiKey(String apiKey) {
     final withoutBearer = apiKey.trim().replaceFirst(
