@@ -156,28 +156,41 @@ class TranscriptionService {
     if (words == null || words.isEmpty) return alternative?['transcript'] as String? ?? '';
 
     final buffer = StringBuffer();
+    
     int lastSpeaker = -1;
-    num lastTime = -1;
-    bool isFirst = true;
+    num lastEndTime = 0;
+    final blockText = StringBuffer();
+    num blockStartTime = 0;
 
-    for (final wordData in words) {
+    for (var i = 0; i < words.length; i++) {
+      final wordData = words[i] as Map<String, dynamic>;
       final speaker = wordData['speaker'] as int? ?? 0;
       final start = wordData['start'] as num? ?? 0;
+      final end = wordData['end'] as num? ?? 0;
       final text = wordData['punctuated_word'] as String? ?? wordData['word'] as String? ?? '';
 
-      if (speaker != lastSpeaker || (start - lastTime > 3.0) || isFirst) {
-        if (!isFirst) buffer.writeln('\n');
-        
-        final m = (start ~/ 60).toString().padLeft(2, '0');
-        final s = (start % 60).floor().toString().padLeft(2, '0');
-        
-        buffer.writeln('[$m:$s] Спикер $speaker:');
-        isFirst = false;
+      if (lastSpeaker != -1 && speaker != lastSpeaker && (start - lastEndTime) > 2.0) {
+        final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
+        final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
+        buffer.writeln('[$m:$s] Спикер $lastSpeaker:');
+        buffer.writeln(blockText.toString().trim());
+        buffer.writeln();
+
+        blockText.clear();
+        blockStartTime = start;
       }
 
-      buffer.write('$text ');
+      if (blockText.isEmpty) blockStartTime = start;
+      blockText.write('$text ');
       lastSpeaker = speaker;
-      lastTime = wordData['end'] as num? ?? start;
+      lastEndTime = end;
+    }
+
+    if (blockText.isNotEmpty) {
+      final m = (blockStartTime ~/ 60).toString().padLeft(2, '0');
+      final s = (blockStartTime % 60).floor().toString().padLeft(2, '0');
+      buffer.writeln('[$m:$s] Спикер $lastSpeaker:');
+      buffer.writeln(blockText.toString().trim());
     }
 
     return buffer.toString().trim();
