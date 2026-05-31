@@ -2,48 +2,16 @@ import 'models/event_model.dart';
 
 class SummaryBuilder {
   static const List<String> _garbagePhrases = [
-    'конечно',
-    'наверное',
-    'честно говоря',
-    'как мне кажется',
-    'я уже не помню',
-    'в общем',
-    'короче',
-    'короче говоря',
-    'так сказать',
-    'собственно говоря',
-    'грубо говоря',
-    'в принципе',
-    'на самом деле',
-    'может быть',
-    'скажем так',
-    'значит',
-    'как бы',
-    'типа',
-    'вообще',
-    'вообще-то',
-    'так вот',
-    'понимаешь',
-    'понимаете',
-    'знаешь',
-    'знаете',
-    'собственно',
-    'как говорится',
-    'само собой',
-    'разумеется',
-    'между прочим',
-    'к слову',
-    'к слову сказать',
-    'следовательно',
-    'кажется',
-    'очевидно',
-    'пожалуй',
-    'вероятно',
-    'туда-сюда',
-    'как-то так',
+    'конечно', 'наверное', 'честно говоря', 'как мне кажется', 'я уже не помню',
+    'в общем', 'короче', 'короче говоря', 'так сказать', 'собственно говоря',
+    'грубо говоря', 'в принципе', 'на самом деле', 'может быть', 'скажем так',
+    'значит', 'как бы', 'типа', 'вообще', 'вообще-то', 'так вот', 'понимаешь',
+    'понимаете', 'знаешь', 'знаете', 'собственно', 'как говорится', 'само собой',
+    'разумеется', 'между прочим', 'к слову', 'к слову сказать', 'следовательно',
+    'кажется', 'очевидно', 'пожалуй', 'вероятно', 'туда-сюда', 'как-то так',
   ];
 
-  String buildSummary(List<EventModel> events, {bool isFemale = false}) {
+  String buildSummary(List<EventModel> events) { // Параметр isFemale больше не нужен
     if (events.isEmpty) {
       return 'Не удалось сформировать краткое содержание.';
     }
@@ -64,7 +32,7 @@ class SummaryBuilder {
 
       usedConcepts.add(concept);
 
-      final rewritten = _compressEvent(event, isFemale);
+      final rewritten = _compressEvent(event); // Убрали передачу isFemale
 
       if (rewritten.isNotEmpty) {
         buffer.write('$rewritten ');
@@ -79,24 +47,20 @@ class SummaryBuilder {
     return '${event.subject}_${event.action}'.toLowerCase();
   }
 
-  String _compressEvent(EventModel event, bool isFemale) {
+  String _compressEvent(EventModel event) { // Убрали параметр isFemale
     var sentence = event.originalSentence;
 
     sentence = sentence.replaceAll(RegExp(r'\[.*?\]'), '');
     sentence = sentence.replaceAll(RegExp(r'Спикер\s*\d+:?', caseSensitive: false), '');
 
-    sentence = _rewriteSentence(sentence, isFemale);
+    // Метод _rewriteSentence удален, замена местоимений происходить не будет
 
     for (final word in _garbagePhrases) {
       final pattern = RegExp(r'(?<![а-яА-ЯёЁ])' + RegExp.escape(word) + r'(?![а-яА-ЯёЁ])', caseSensitive: false);
       sentence = sentence.replaceAll(pattern, '');
     }
 
-    final startWordWithComma = RegExp(
-      r'^[а-яёА-ЯЁ]+\s*,', 
-      caseSensitive: false
-    );
-
+    final startWordWithComma = RegExp(r'^[а-яёА-ЯЁ]+\s*,', caseSensitive: false);
     if (startWordWithComma.hasMatch(sentence)) {
       sentence = sentence.replaceFirst(startWordWithComma, '');
     }
@@ -111,7 +75,7 @@ class SummaryBuilder {
     }
 
     sentence = sentence.replaceAll(RegExp(r'\s+'), ' ').trim();
-    sentence = sentence.replaceAll(RegExp(r'^[,.!?;:]+\s*'), ''); // Убираем знаки в начале
+    sentence = sentence.replaceAll(RegExp(r'^[,.!?;:]+\s*'), ''); 
 
     if (sentence.isEmpty) return '';
     sentence = sentence[0].toUpperCase() + sentence.substring(1);
@@ -120,36 +84,6 @@ class SummaryBuilder {
     }
 
     return sentence;
-  }
-  
-  String _rewriteSentence(String sentence, bool isFemale) {
-    var result = sentence;
-
-    final Map<String, String> replacements = {
-      r'я': isFemale ? 'рассказчица' : 'рассказчик',
-      r'Я': isFemale ? 'Рассказчица' : 'Рассказчик',
-      r'мне': isFemale ? 'рассказчице' : 'рассказчику',
-      r'Мне': isFemale ? 'Рассказчице' : 'Рассказчику',
-      r'меня': 'рассказчика',
-      r'Меня': 'Рассказчика',
-      r'мы': 'они',
-      r'Мы': 'Они',
-      r'мой': isFemale ? 'её' : 'его',
-      r'Мой': isFemale ? 'Её' : 'Его',
-      r'моя': isFemale ? 'её' : 'его',
-      r'Моя': isFemale ? 'Её' : 'Его',
-      r'моё': isFemale ? 'её' : 'его',
-      r'Моё': isFemale ? 'Её' : 'Его',
-      r'мои': isFemale ? 'её' : 'его',
-      r'Мои': isFemale ? 'Её' : 'Его',
-    };
-
-    replacements.forEach((word, replacement) {
-      final pattern = RegExp(r'(?<![а-яА-ЯёЁ])' + word + r'(?![а-яА-ЯёЁ])');
-      result = result.replaceAll(pattern, replacement);
-    });
-
-    return result;
   }
 
   String _cleanup(String text) {
